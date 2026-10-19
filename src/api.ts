@@ -44,6 +44,19 @@ function statusToCode(status: number): string {
 const NETWORK_ERROR_MESSAGE = '网络连接失败，请检查网络后重试'
 
 /**
+ * API 基址（§12-D2 国内外分流）：
+ * - 默认空串 = 同源相对路径（Worker / CF Pages 同源部署时）；
+ * - 静态镜像站（GitHub Pages / Gitee Pages）构建时经 `VITE_API_BASE`
+ *   指向 Worker 绝对地址，使镜像站页面可跨源调用后端。
+ */
+const API_BASE: string = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
+
+/** 拼接 API 基址与相对路径（去重斜杠） */
+function apiUrl(path: string): string {
+  return path.startsWith('/') ? `${API_BASE}${path}` : `${API_BASE}/${path}`
+}
+
+/**
  * 归一化 API 错误（§5.1）。
  * 与共享类型 `ApiError`（shared/types.ts）结构一致：{code, message, details?}。
  */
@@ -98,7 +111,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
   let res: Response
   try {
-    res = await fetch(path, { method, headers, body, credentials: 'include', signal })
+    res = await fetch(apiUrl(path), { method, headers, body, credentials: 'include', signal })
   } catch {
     throw new ApiError('INTERNAL', NETWORK_ERROR_MESSAGE)
   }
@@ -153,7 +166,7 @@ export async function streamSSE<T = unknown>(
 ): Promise<void> {
   let res: Response
   try {
-    res = await fetch(path, {
+    res = await fetch(apiUrl(path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       body: JSON.stringify(json ?? {}),
@@ -349,11 +362,13 @@ export class TerminalSocket {
     this.sendMessage({ type: 'exec', id, command, timeoutSec })
   }
 
-  /** 实际建立连接（内部）：按页面协议派生 wss:// URL */
+  /** 实际建立连接（内部）：配置了 API_BASE 时直连 Worker；否则按页面协议派生同源 wss:// */
   private openWs(): void {
-    const proto = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${proto}//${globalThis.location.host}/api/terminal/connect?backendId=${encodeURIComponent(this.backendId)}`
-    const ws = new WebSocket(url)
+    const target = `${API_BASE}/api/terminal/connect?backendId=${encodeURIComponent(this.backendId)}`
+    const wsUrl = API_BASE
+      ? target.replace(/^http/, 'ws')
+      : `${globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${globalThis.location.host}${target}`
+    const ws = new WebSocket(wsUrl)
     this.ws = ws
     ws.onopen = (): void => {
       this.reconnectAttempt = 0

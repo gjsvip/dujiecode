@@ -1,13 +1,15 @@
 name: Deploy to Cloudflare
 
-# 同步部署：push 到 main 或手动触发时，自动构建并部署到 Cloudflare
+# 同步部署：push 到 main 或手动触发时，自动构建并部署
 #   - D1 数据库初始化（幂等，IF NOT EXISTS）
-#   - Worker（dujiecode.dujie-nb.workers.dev）
+#   - Worker（dujiecode.dujie-nb.workers.dev，含国内外 geo 分流）
 #   - Pages 官网（dujiecode.pages.dev）
+#   - GitHub Pages 国内可达镜像（gjsvip.github.io/dujiecode）
 #
 # 所需 Secrets（仓库 Settings → Secrets and variables → Actions）：
 #   CF_API_TOKEN        Cloudflare API Token（需 Workers/D1/Pages 编辑权限）
 #   CLOUDFLARE_ACCOUNT_ID  Cloudflare 账户 ID
+#   （GITHUB_TOKEN 由 Actions 自动提供，无需手动配置）
 
 on:
   push:
@@ -78,3 +80,50 @@ jobs:
           echo "| Worker API | https://dujiecode.dujie-nb.workers.dev |" >> $GITHUB_STEP_SUMMARY
           echo "| Pages 官网 | https://dujiecode.pages.dev |" >> $GITHUB_STEP_SUMMARY
           echo "| 提交 | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+
+  # 国内可达镜像（§12-D2）：GitHub Pages 项目页，静态官网。
+  # 构建基址 /dujiecode/（项目页子路径），CTA 绝对链接指向 Worker 工作台。
+  deploy-gh-pages:
+    name: Deploy GitHub Pages (国内镜像)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (base=/dujiecode/)
+        run: |
+          npx tsc --noEmit
+          VITE_BASE=/dujiecode/ \
+          VITE_APP_URL=https://dujiecode.dujie-nb.workers.dev \
+          npx vite build --outDir dist-pages
+
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist-pages
+          publish_branch: gh-pages
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_message: "deploy: 官网镜像 ${{ github.sha }}"
+
+      - name: Summary
+        run: |
+          {
+            echo "### GitHub Pages 镜像已部署 :globe_with_meridians:"
+            echo ""
+            echo "- 地址：https://gjsvip.github.io/dujiecode/"
+            echo "- 用途：国内网络可达的静态官网（geo 分流目标）"
+          } >> $GITHUB_STEP_SUMMARY

@@ -6,7 +6,7 @@
  * 架构简图（纯 HTML/CSS 绘制）→ 快速开始（3 步，含一键安装命令）→ FAQ → 页脚。
  * 全中文，响应式，深色 IDE 主题与 §6.4 色板严格一致。
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 /* ------------------------------------------------------------------ */
@@ -20,11 +20,54 @@ const INSTALL_COMMAND =
 const RUN_COMMAND =
   'python3 dujie-agent.py --server wss://dujiecode.dujie-nb.workers.dev --backend-id bk_你的后端ID --token djt_你的令牌'
 
+/**
+ * 工作台入口基址（§12-D2 国内外分流）：
+ * 静态镜像站（GitHub Pages 等）构建时经 VITE_APP_URL 指向 Worker 绝对地址；
+ * 默认空串 = 同源 SPA 路由（Cloudflare 同源部署时）。
+ */
+const APP_URL: string = (import.meta.env.VITE_APP_URL ?? '').replace(/\/+$/, '')
+
+/** 访问入口总表（国内外分流 + 双源码托管，§12-D2） */
+const MIRROR_LINKS: readonly {
+  label: string
+  url: string
+  region: '国内' | '海外' | '源码'
+  note: string
+  primary?: boolean
+}[] = [
+  {
+    label: 'Cloudflare 完整版',
+    url: 'https://dujiecode.dujie-nb.workers.dev',
+    region: '海外',
+    note: 'Worker + D1 + R2 + DO，功能最全，工作台入口',
+    primary: true,
+  },
+  {
+    label: 'GitHub Pages 镜像',
+    url: 'https://gjsvip.github.io/dujiecode/',
+    region: '国内',
+    note: '静态官网，国内网络推荐，免实名即可访问',
+  },
+  {
+    label: 'Gitee 仓库',
+    url: 'https://gitee.com/dujie_nb_admin/dujiecode',
+    region: '国内',
+    note: '国内代码托管（GitHub 自动镜像）；Gitee Pages 实名后启用',
+  },
+  {
+    label: 'GitHub 仓库',
+    url: 'https://github.com/gjsvip/dujiecode',
+    region: '源码',
+    note: '主仓库，push 即自动部署三端',
+  },
+]
+
 /** 顶部导航锚点 */
 const NAV_LINKS: readonly { href: string; label: string }[] = [
   { href: '#features', label: '特性' },
   { href: '#terminal', label: '双终端' },
   { href: '#architecture', label: '架构' },
+  { href: '#mirrors', label: '访问入口' },
   { href: '#quickstart', label: '快速开始' },
   { href: '#faq', label: '常见问题' },
 ]
@@ -183,6 +226,88 @@ function cx(...parts: (string | false | undefined | null)[]): string {
 }
 
 /* ------------------------------------------------------------------ */
+/* 国内外分流（§12-D2）                                                  */
+/* ------------------------------------------------------------------ */
+
+/** /api/region 响应（Worker 侧免鉴权端点） */
+interface RegionInfo {
+  country: string
+  cnMirror: string
+  appUrl: string
+}
+
+/**
+ * 访客地域探测：仅 Cloudflare 同源副本（Worker / 带 API 的部署）可用。
+ * 静态镜像站无此接口时返回 null，页面静默降级为静态镜像列表。
+ */
+function useRegionHint(): RegionInfo | null {
+  const [info, setInfo] = useState<RegionInfo | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/region', { headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? (res.json() as Promise<RegionInfo>) : null))
+      .then((data) => {
+        if (alive && data !== null && typeof data.country === 'string') {
+          setInfo(data)
+        }
+      })
+      .catch(() => {
+        // 静态镜像（GitHub Pages 等）：无 /api/region，忽略
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+  return info
+}
+
+/** 国内访客顶部提示条（仅探测到 country=CN 时展示） */
+function RegionBanner({ info }: { info: RegionInfo }): ReactNode {
+  if (info.country !== 'CN') {
+    return null
+  }
+  return (
+    <div className="border-b border-accent/40 bg-accent/10">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 text-xs text-text">
+        <Icon name="alert" className="h-3.5 w-3.5 shrink-0 text-accent" />
+        <span>检测到您位于国内网络，推荐访问国内镜像以获得更佳速度：</span>
+        <a
+          href={info.cnMirror}
+          className="font-medium text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+        >
+          {info.cnMirror.replace(/^https?:\/\//, '')}
+        </a>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 工作台 CTA：配置了 APP_URL（静态镜像构建）时用绝对链接指向 Worker；
+ * 否则走同源 SPA 路由。
+ */
+function AppCta({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className: string
+}): ReactNode {
+  if (APP_URL !== '') {
+    return (
+      <a href={`${APP_URL}/login`} className={className}>
+        {children}
+      </a>
+    )
+  }
+  return (
+    <Link to="/login" className={className}>
+      {children}
+    </Link>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* 页面片段                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -206,9 +331,7 @@ function SiteHeader(): ReactNode {
             </a>
           ))}
         </nav>
-        <Link to="/login" className="btn btn-primary btn-sm">
-          进入工作台
-        </Link>
+        <AppCta className="btn btn-primary btn-sm">进入工作台</AppCta>
       </div>
     </header>
   )
@@ -243,17 +366,17 @@ function Hero(): ReactNode {
         </p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/login" className="btn btn-primary btn-lg">
+          <AppCta className="btn btn-primary btn-lg">
             免费开始使用
             <Icon name="arrow" className="h-4 w-4" />
-          </Link>
+          </AppCta>
           <a href="#quickstart" className="btn btn-outline btn-lg">
             查看快速开始
           </a>
         </div>
 
         <p className="mt-6 text-xs text-dim">
-          部署于 Cloudflare Workers · 官网与 SPA 同源发布 · 数据按账号隔离
+          部署于 Cloudflare Workers · 国内外多镜像自动分流 · 数据按账号隔离
         </p>
 
         <ProductPreview />
@@ -583,10 +706,10 @@ function QuickStart(): ReactNode {
               <p className="mt-3 text-[13px] leading-relaxed text-dim">{item.desc}</p>
 
               {item.action === 'login' && (
-                <Link to="/login" className="btn btn-primary btn-sm mt-4 self-start">
+                <AppCta className="btn btn-primary btn-sm mt-4 self-start">
                   前往注册
                   <Icon name="arrow" className="h-3.5 w-3.5" />
-                </Link>
+                </AppCta>
               )}
 
               {item.command && (
@@ -604,6 +727,65 @@ function QuickStart(): ReactNode {
             </div>
           ))}
         </div>
+      </div>
+    </section>
+  )
+}
+
+/** 访问入口（国内外分流，§12-D2）：Cloudflare 侧按访客地域自动 302，
+ *  静态镜像站展示全量入口列表，保证任何网络下官网可达 */
+function MirrorSection(): ReactNode {
+  const regionStyle: Record<'国内' | '海外' | '源码', string> = {
+    国内: 'border-ok/40 text-ok',
+    海外: 'border-accent/40 text-accent',
+    源码: 'border-border text-dim',
+  }
+  return (
+    <section id="mirrors" className="scroll-mt-20 border-t border-border/60 py-20">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-2xl font-bold tracking-wide sm:text-3xl">访问入口</h2>
+          <p className="mt-4 text-sm leading-relaxed text-dim sm:text-base">
+            三端同步、按地域自动分流：国内访客访问 Cloudflare 官网时将自动前往国内镜像，
+            海外访客留在 Cloudflare 完整版；源码双托管（GitHub 主库 + Gitee 国内镜像）。
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-4 sm:grid-cols-2">
+          {MIRROR_LINKS.map((mirror) => (
+            <a
+              key={mirror.url}
+              href={mirror.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className={cx(
+                'card flex items-start gap-3 p-5 transition-colors hover:border-accent/50',
+                mirror.primary && 'border-accent/50',
+              )}
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent/15 text-accent">
+                <Icon name={mirror.region === '源码' ? 'file' : 'cloud'} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-[15px] font-semibold text-text">{mirror.label}</span>
+                  <span className={cx('chip', regionStyle[mirror.region])}>{mirror.region}</span>
+                  {mirror.primary && <span className="chip border-ok/40 text-ok">推荐</span>}
+                </span>
+                <span className="mt-2 block break-all font-mono text-[11px] leading-relaxed text-dim">
+                  {mirror.url.replace(/^https?:\/\//, '')}
+                </span>
+                <span className="mt-1.5 block text-xs leading-relaxed text-dim">{mirror.note}</span>
+              </span>
+              <Icon name="external" className="mt-1 h-4 w-4 shrink-0 text-dim" />
+            </a>
+          ))}
+        </div>
+
+        <p className="mx-auto mt-6 max-w-3xl text-center text-[11px] leading-relaxed text-dim">
+          分流由 Cloudflare Worker 依据访客 IP 地域（<span className="font-mono">request.cf.country</span>）实时判定，
+          仅对官网根路径生效；能直达 Cloudflare 的国内用户仍可正常使用工作台。
+        </p>
       </div>
     </section>
   )
@@ -710,14 +892,17 @@ function SiteFooter(): ReactNode {
 
 /** 官网落地页（§6.1 /） */
 export default function LandingPage(): ReactNode {
+  const region = useRegionHint()
   return (
     <div className="min-h-screen bg-bg font-sans text-text">
+      {region !== null && <RegionBanner info={region} />}
       <SiteHeader />
       <main>
         <Hero />
         <Features />
         <DualTerminal />
         <Architecture />
+        <MirrorSection />
         <QuickStart />
         <Faq />
       </main>

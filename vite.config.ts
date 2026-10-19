@@ -3,7 +3,8 @@
  * - react + @tailwindcss/vite 插件（Tailwind v4 无需单独 postcss/tailwind.config）；
  * - `@shared` 别名与 tsconfig.json paths 保持一致（前后端共享契约目录）；
  * - publicDir="agent"：构建时把 dujie-agent.py 复制进 dist 根（§8.1 一键安装 curl 下载）；
- * - 产物输出 dist/（wrangler.toml [assets] directory 指向该目录）。
+ * - 产物输出 dist/（wrangler.toml [assets] directory 指向该目录）；
+ * - base 可经 VITE_BASE 覆盖（§12-D2）：GitHub Pages 项目页需 /dujiecode/ 子路径。
  */
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -13,6 +14,7 @@ import tailwindcss from '@tailwindcss/vite'
 const sharedDir = new URL('./shared', import.meta.url).pathname
 
 export default defineConfig({
+  base: process.env.VITE_BASE ?? '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

@@ -32,6 +32,17 @@ import backendRoutes from './routes/backends'
 export { TerminalRoom } from '../do/terminal-room'
 
 /* ------------------------------------------------------------------ */
+/* 国内外分流（§12-D2）：镜像地址常量 + /api/region + 官网根路径 geo 302   */
+/* ------------------------------------------------------------------ */
+
+/** 国内镜像默认地址（GitHub Pages，国内可达且免实名认证；Gitee Pages 启用后经 CN_MIRROR_URL 覆盖） */
+const DEFAULT_CN_MIRROR = 'https://gjsvip.github.io/dujiecode/'
+/** Gitee Pages 预期地址（账户完成实名认证并在仓库「服务 → Gitee Pages」启用后生效） */
+const GITEE_PAGES_MIRROR = 'https://dujie_nb_admin.gitee.io/dujiecode'
+/** CF Pages 官网镜像（静态版，海外可达） */
+const CF_PAGES_MIRROR = 'https://dujiecode.pages.dev'
+
+/* ------------------------------------------------------------------ */
 /* Hono 应用与统一 JSON 错误响应助手                                     */
 /* ------------------------------------------------------------------ */
 
@@ -102,12 +113,23 @@ const CORS_ALLOWED_HEADERS = 'Content-Type, Authorization, X-Request-Id'
 /**
  * 判断 Origin 是否命中白名单：
  * - APP_ORIGIN 环境变量（生产前端源，精确匹配）；
+ * - CORS_ORIGINS 环境变量（逗号分隔的多镜像源：GitHub Pages / CF Pages / Gitee Pages）；
  * - 本地开发源 http(s)://localhost | 127.0.0.1 任意端口（Vite dev / wrangler dev）。
  */
 function isOriginAllowed(origin: string, env: Env): boolean {
   const appOrigin = readEnvVar(env, 'APP_ORIGIN', '')
   if (appOrigin !== '' && origin === appOrigin) {
     return true
+  }
+  const extraOrigins = readEnvVar(env, 'CORS_ORIGINS', '')
+  if (extraOrigins !== '') {
+    const list = extraOrigins
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item !== '')
+    if (list.includes(origin)) {
+      return true
+    }
   }
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
 }
@@ -152,6 +174,8 @@ const AUTH_EXEMPTIONS: ReadonlyArray<{ method: string; path: string }> = [
   { method: 'POST', path: '/api/auth/register' },
   { method: 'POST', path: '/api/auth/login' },
   { method: 'GET', path: '/api/agent/connect' },
+  // 地域与镜像信息（§12-D2 国内外分流）：落地页免登录获取访客国家与推荐入口
+  { method: 'GET', path: '/api/region' },
 ]
 
 /** api 限流 KV 计数 TTL（秒）：120s 覆盖前后两个分钟桶，保证窗口滑动 */
@@ -254,6 +278,23 @@ app.route('/api', conversationRoutes)
 // 执行后端 / agent token / WS 升级（§8）：挂 /api，含 /terminal/connect、/agent/connect
 app.route('/api', backendRoutes)
 
+// 地域与镜像信息（§12-D2）：免鉴权。落地页据此展示「国内/海外推荐入口」提示，
+// 静态镜像（GitHub Pages 等） fetch 失败时静默降级为静态镜像列表。
+app.get('/api/region', (c) => {
+  const country = c.req.raw.cf?.country ?? 'unknown'
+  return c.json({
+    country,
+    cnMirror: readEnvVar(c.env, 'CN_MIRROR_URL', DEFAULT_CN_MIRROR),
+    appUrl: readEnvVar(c.env, 'APP_ORIGIN', ''),
+    mirrors: {
+      cloudflare: readEnvVar(c.env, 'APP_ORIGIN', ''),
+      cfPages: CF_PAGES_MIRROR,
+      githubPages: DEFAULT_CN_MIRROR,
+      giteePages: GITEE_PAGES_MIRROR,
+    },
+  })
+})
+
 /** 统一错误归一化（§5.1）：HttpError 原样渲染；未预期异常 500 且细节只进日志 */
 app.onError((err, c) => {
   const requestId = requestIdByRequest.get(c.req.raw) ?? 'unknown'
@@ -298,6 +339,16 @@ const worker: ExportedHandler<Env> = {
     const url = new URL(request.url)
     if (url.pathname.startsWith('/api/')) {
       return app.fetch(request, env, ctx)
+    }
+    // 国内外分流（§12-D2）：国内访客访问官网根路径 → 302 跳转国内镜像。
+    // 仅拦截文档入口（GET / 与 /index.html）；SPA 子路由与静态资源不受影响，
+    // 能直达 Cloudflare 的国内用户仍可正常使用工作台。
+    if (
+      request.method === 'GET' &&
+      (url.pathname === '/' || url.pathname === '/index.html') &&
+      request.cf?.country === 'CN'
+    ) {
+      return Response.redirect(readEnvVar(env, 'CN_MIRROR_URL', DEFAULT_CN_MIRROR), 302)
     }
     try {
       // 静态资源 / SPA 回退（index.html）；ASSETS 对不存在路径按
