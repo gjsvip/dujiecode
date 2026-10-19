@@ -98,3 +98,58 @@ python3 dujie-agent.py --server wss://dujiecode.dujie-nb.workers.dev --backend-i
 | `do/` | Durable Object `TerminalRoom`（终端房间中继） |
 | `agent/` | `dujie-agent.py`（Python3 零依赖执行代理，构建时复制进 dist） |
 | `tests/` | Vitest 纯函数单测 |
+| `scripts/` | `publish.sh`（一键双平台开源发布） |
+| `docs/` | PRD、架构设计、类图/时序图、CSDN 发布文章稿 |
+
+## 开源发布（国内 + 国外双平台）
+
+代码以 MIT 协议开源，采用 **GitHub 主力 + Gitee 国内镜像** 的双仓库策略：GitHub 保有完整历史，Gitee 镜像由 GitHub Actions 在每次 push 到 `main` 时自动同步（`git push --force --mirror`），两边数据始终一致。
+
+### 一键发布
+
+仓库内置发布脚本，配置好账号后一条命令完成双平台推送：
+
+```bash
+# 方式一：环境变量（HTTPS + Personal Access Token）
+GH_USER=你的GitHub用户名 GH_TOKEN=ghp_xxx \
+GITEE_USER=你的Gitee用户名 GITEE_TOKEN=xxx \
+./scripts/publish.sh
+
+# 方式二：SSH 密钥（需提前配置好两个平台的公钥）
+./scripts/publish.sh --ssh
+```
+
+脚本会自动完成：检查 git 状态 → 配置 `origin`（GitHub）与 `gitee`（Gitee）双 remote → 推送 `main` 分支 → 打印两个平台的仓库地址。
+
+### 自动镜像配置（GitHub Actions）
+
+`.github/workflows/mirror-to-gitee.yml` 已内置镜像工作流，只需在 GitHub 仓库
+**Settings → Secrets and variables → Actions** 中添加两个 Secret：
+
+| Secret | 值 |
+|---|---|
+| `GITEE_USER` | Gitee 用户名 |
+| `GITEE_TOKEN` | Gitee 个人访问令牌（需 `projects` 权限） |
+
+之后每次 `git push origin main` 都会自动同步到 Gitee。
+
+### CSDN 发布
+
+`docs/CSDN-article.md` 是一篇完整的发布文章稿（产品介绍 + 架构图 + 快速开始），注册 CSDN 账号后直接粘贴发布即可，建议勾选"原创"并添加标签：开源、AI编程、Cloudflare Workers。
+
+### 平台注册实测记录（2026-10-18，沙箱环境）
+
+在自动化环境中注册各平台时遇到 IP 级风控/区域限制，实测结论如下，供在正常网络环境下注册参考：
+
+| 平台 | 结果 | 原因 |
+|---|---|---|
+| GitHub | ✗ 受阻 | DataDome「Access is temporarily restricted」，IP 级封禁 |
+| GitLab.com | ✗ 受阻 | 检测到中国大陆访问，引导至 JiHu 且无注册表单 |
+| 极狐 GitLab（JiHu） | ✗ 受阻 | 「安全检测中」勾选验证无法通过 |
+| Gitee | ✗ 受阻 | HTTP 405 Method Not Allowed |
+| GitCode（CSDN） | ✗ 受阻 | HTTP 418 |
+| Codeberg | ✗ 受阻 | HTTP 429 限流 |
+| SourceHut | ✗ 受阻 | HTTP 418 |
+| Bitbucket | ✗ 受阻 | 跳转 Atlassian 登录且有 reCAPTCHA |
+
+> 以上为沙箱出口 IP 的实测结果，正常家用/办公网络注册 Gitee 与 GitHub 通常无障碍。

@@ -1,0 +1,27 @@
+# 渡劫code 提交后自动镜像到 Gitee（数据互通：GitHub 为主仓库，Gitee 自动同步）
+#
+# 配置方法（仓库 Settings > Secrets and variables > Actions）：
+#   GITEE_USER   = 你的 Gitee 用户名
+#   GITEE_TOKEN  = Gitee 个人访问令牌（用户设置 > 私人令牌，勾选 projects 权限）
+name: mirror-to-gitee
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Mirror to Gitee
+        run: |
+          git remote add gitee "https://${{ secrets.GITEE_USER }}:${{ secrets.GITEE_TOKEN }}@gitee.com/${{ secrets.GITEE_USER }}/dujiecode.git"
+          git push --force --mirror gitee
+        env:
+          GIT_TERMINAL_PROMPT: 0
