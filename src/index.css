@@ -1,0 +1,125 @@
+/**
+ * 渡劫code 全局样式（架构文档 §3.3 #13，主题色板严格按 §6.4）：
+ * Tailwind v4 CSS-first 配置——@theme 定义深色 IDE 主题变量；
+ * 含 xterm.js / Monaco 微调与全站统一组件类（btn / field / card 等）。
+ * 色值（渡劫紫 #7c6cf0 等）与 §6.4 表格一一对应，不得改动。
+ */
+@import "tailwindcss";
+
+@theme {
+  /* ---- 色彩（§6.4 深色 IDE 主题） ---- */
+  --color-bg: #0b0e14; /* 应用底色 */
+  --color-panel: #11151f; /* 侧栏 / 面板 */
+  --color-elev: #161b2a; /* 悬浮层 / 弹窗 */
+  --color-border: #232a3d; /* 分隔线 */
+  --color-text: #d7dce8; /* 主文字 */
+  --color-dim: #8a93a8; /* 次级文字 */
+  --color-accent: #7c6cf0; /* 品牌 / 主操作（渡劫紫） */
+  --color-ok: #3fb950; /* 成功 */
+  --color-warn: #d29922; /* 警告 / 审批 */
+  --color-err: #f85149; /* 危险 / 错误 */
+
+  /* ---- 字体（§6.4：代码区等宽 / UI 系统 sans） ---- */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "Cascadia Code", "SFMono-Regular",
+    Consolas, "Liberation Mono", monospace;
+
+  /* ---- 圆角 / 阴影令牌（全站统一） ---- */
+  --radius-card: 12px;
+  --shadow-panel: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    /* 官网锚点导航平滑滚动，并避开 sticky 顶栏高度 */
+    scroll-behavior: smooth;
+    scroll-padding-top: 4rem;
+  }
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    min-height: 100vh;
+  }
+  ::selection {
+    @apply bg-accent/40 text-white;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent/70;
+  }
+  /* 细长深色滚动条（IDE 观感） */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 9999px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-dim);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+}
+
+/* ---- xterm.js 微调：透明背景融入面板，避免默认亮色底 ---- */
+.xterm {
+  background-color: transparent;
+}
+.xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* ---- Monaco 微调：编辑器底色与深色 IDE 一致 ---- */
+.monaco-editor,
+.monaco-editor-background,
+.monaco-editor .margin {
+  background-color: #0b0e14 !important;
+}
+
+/* ---- 全站统一组件类（与 Tailwind 工具类可自由组合，工具类优先级更高） ---- */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium leading-none transition-colors duration-150 select-none;
+  }
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent/90 active:bg-accent/80;
+  }
+  .btn-outline {
+    @apply border-border bg-transparent text-text hover:border-accent/70 hover:text-accent;
+  }
+  .btn-ghost {
+    @apply text-dim hover:bg-panel hover:text-text;
+  }
+  .btn-danger {
+    @apply bg-err text-white hover:bg-err/85;
+  }
+  .btn-sm {
+    @apply rounded-md px-3 py-1.5 text-xs;
+  }
+  .btn-lg {
+    @apply px-5 py-2.5 text-[15px];
+  }
+  .field {
+    @apply w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors placeholder:text-dim/60 focus:border-accent focus:outline-none;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium text-dim;
+  }
+  .card {
+    @apply rounded-card border border-border bg-panel;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-panel px-2.5 py-1 text-[11px] text-dim;
+  }
+  .code-block {
+    @apply overflow-x-auto rounded-card border border-border bg-bg px-4 py-3 font-mono text-[13px] leading-relaxed text-text;
+  }
+}

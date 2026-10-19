@@ -1,0 +1,116 @@
+%% 渡劫code 类图（与 docs/ARCHITECTURE.md §13.4 同步）
+classDiagram
+  direction LR
+  class Env {
+    +DB: D1Database
+    +KV: KVNamespace
+    +R2: R2Bucket
+    +TERMINAL_ROOM: DurableObjectNamespace
+    +ASSETS: Fetcher
+    +ENCRYPTION_KEY: string
+    +JWT_SECRET: string
+  }
+  class CryptoService {
+    +hashPassword(pw) string
+    +verifyPassword(pw, stored) boolean
+    +encryptSecret(plain) string
+    +decryptSecret(enc) string
+    +signJwt(payload) string
+    +verifyJwt(token) payload
+    +sha256Hex(input) string
+  }
+  class DbService {
+    +dbFirst(sql, args) row
+    +dbAll(sql, args) rows
+    +dbRun(sql, args) result
+  }
+  class AuthMiddleware {
+    +requireAuth(c, next)
+    +rateLimit(kind, key, limit, window, c, next)
+  }
+  class AuthRoutes
+  class ProviderRoutes
+  class WorkspaceRoutes
+  class ConversationRoutes
+  class BackendRoutes
+  class ShellRoutes
+  class LlmAdapter {
+    <<interface>>
+    +streamChat(req) AsyncIterator
+  }
+  class OpenAiAdapter
+  class AnthropicAdapter
+  class GeminiAdapter
+  class AgentLoop {
+    -rounds: number
+    +run(ctx) void
+    -awaitApproval(id) string
+  }
+  class ToolExecutor {
+    +execute(call, ctx) ToolResult
+  }
+  class DangerMatcher {
+    +match(command) DangerRule
+  }
+  class FileService {
+    +getTree(wsId) FileNode
+    +readFile(wsId, path) string
+    +writeFile(wsId, path, content) void
+    +deleteNode(wsId, path) void
+    +renameNode(wsId, from, to) void
+    +search(wsId, q) matches
+  }
+  class VirtualShell {
+    +execute(command, wsId) ShellResult
+  }
+  class TerminalRoom {
+    -agent: WebSocket
+    -browsers: Map
+    +fetch(req) Response
+    +handleMessage(msg, from) void
+  }
+  class ExecAgent {
+    <<external python3>>
+    +connect(url, token)
+    +onMessage(line) void
+  }
+  class ApiClient {
+    +get(path) json
+    +post(path, body) json
+    +stream(path, body, onEvent) void
+    +openTerminal(backendId, handlers) TerminalSocket
+  }
+  class AuthStore
+  class WorkspaceStore
+  class ChatStore
+  class TerminalStore
+
+  Env <.. CryptoService
+  Env <.. DbService
+  AuthMiddleware --> CryptoService
+  AuthRoutes --> CryptoService
+  AuthRoutes --> DbService
+  ProviderRoutes --> CryptoService
+  ProviderRoutes --> DbService
+  ProviderRoutes --> LlmAdapter
+  WorkspaceRoutes --> FileService
+  ConversationRoutes --> AgentLoop
+  ConversationRoutes --> DbService
+  AgentLoop --> LlmAdapter
+  AgentLoop --> ToolExecutor
+  AgentLoop --> DangerMatcher
+  ToolExecutor --> FileService
+  ToolExecutor --> VirtualShell
+  ToolExecutor --> TerminalRoom
+  ShellRoutes --> VirtualShell
+  ShellRoutes --> TerminalRoom
+  BackendRoutes --> CryptoService
+  BackendRoutes --> TerminalRoom
+  OpenAiAdapter --|> LlmAdapter
+  AnthropicAdapter --|> LlmAdapter
+  GeminiAdapter --|> LlmAdapter
+  TerminalRoom --> ExecAgent : WebSocket
+  AuthStore --> ApiClient
+  WorkspaceStore --> ApiClient
+  ChatStore --> ApiClient
+  TerminalStore --> ApiClient

@@ -1,0 +1,36 @@
+name = "dujiecode"
+main = "worker/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dujiecode-db"
+database_id = "52f270d9-1d75-41bc-9df1-95264224e91e"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "e8664fb54b174330be46abad29727a31"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "dujiecode-files"
+
+[[durable_objects.bindings]]
+name = "TERMINAL_ROOM"
+class_name = "TerminalRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TerminalRoom"]
+
+[vars]
+ENVIRONMENT = "production"
+APP_ORIGIN = "https://dujiecode.dujie-nb.workers.dev"
+MAX_AGENT_ROUNDS = "25"
+SSE_KEEPALIVE_SEC = "15"

@@ -1,0 +1,95 @@
+%% 渡劫code 关键序列图（与 docs/ARCHITECTURE.md §13 同步）
+
+%% ===== 1. 注册 / 登录 =====
+sequenceDiagram
+  actor U as 用户
+  participant SPA as 浏览器 SPA
+  participant W as Worker(Hono)
+  participant D1 as D1
+  participant KV as KV
+  U->>SPA: 填写邮箱+密码, 点击注册
+  SPA->>W: POST /api/auth/register
+  W->>D1: 查询邮箱唯一性
+  W->>W: PBKDF2-SHA256(100k 次, 随机盐) 派生 password_hash
+  W->>D1: INSERT users
+  W->>W: 签发 JWT(HS256, jti, exp=7d)
+  W->>KV: SET session:{jti} TTL 7d
+  W-->>SPA: 201 {user} + Set-Cookie dj_session(HttpOnly, Secure, SameSite=Lax)
+  SPA-->>U: 跳转 /dashboard
+  Note over U,KV: 登录: POST /api/auth/login 同流程, 校验 PBKDF2 哈希后发 Cookie
+
+%% ===== 2. Agent 对话循环（含审批） =====
+sequenceDiagram
+  actor U as 用户
+  participant CP as ChatPanel
+  participant W as Worker
+  participant AD as LlmAdapter
+  participant LLM as 供应商 API
+  participant D1 as D1
+  participant TE as ToolExecutor
+  participant VFS as 虚拟Shell / 文件 / DO
+  U->>CP: 输入需求, 点击发送
+  CP->>W: POST /api/conversations/:id/messages
+  W->>D1: 落库 user message + 加载历史
+  W-->>CP: event: meta
+  loop 最多 25 轮
+    W->>AD: streamChat(messages, tools)
+    AD->>LLM: POST 流式请求(三协议之一)
+    LLM-->>AD: SSE chunks
+    AD-->>W: 归一化 token / tool_call / usage
+    W-->>CP: event: token (逐 token 渲染)
+    alt 模型返回 tool_call
+      W->>W: DangerMatcher.match(command)
+      opt 命中危险规则
+        W->>D1: INSERT approvals(pending)
+        W-->>CP: event: approval_request
+        CP-->>U: 审批卡片
+        U->>CP: 允许 / 拒绝
+        CP->>W: POST /approvals/:aid {decision}
+        W->>D1: UPDATE approvals
+        Note over W: 循环内每 1s 轮询检测决策
+        W-->>CP: event: approval_resolved
+      end
+      W->>TE: executeTool(toolCall)
+      TE->>VFS: 读写文件 / 执行命令
+      VFS-->>TE: 结果
+      W-->>CP: event: tool_result
+      W->>D1: 追加 assistant/tool 消息
+    else 无 tool_call
+      W-->>CP: event: done
+    end
+  end
+  W->>D1: 更新 messages/usage/conversation.status
+
+%% ===== 3. 终端连接与远程执行 =====
+sequenceDiagram
+  actor U as 用户
+  participant XT as xterm.js
+  participant W as Worker
+  participant DO as TerminalRoom(DO)
+  participant AG as dujie-agent.py
+  participant SH as 服务器 Shell
+  Note over AG,DO: 代理已提前外连并通过 token 鉴权
+  AG->>DO: WSS /api/agent/connect?backendId&token
+  DO->>D1: 校验 token 哈希(缓存 KV)
+  DO-->>AG: 101 + 房间就绪
+  AG->>DO: {"type":"hello","hostname":"..."}
+  U->>XT: 打开 SSH Tab
+  XT->>W: WSS /api/terminal/connect?backendId= (Cookie JWT)
+  W->>W: 鉴权 + 归属校验
+  W->>DO: 转发 Upgrade(room=backendId)
+  DO-->>XT: 101 已连接
+  XT->>DO: {"type":"spawn","id":"s1","cols":80,"rows":24}
+  DO->>AG: 透传
+  AG->>SH: pty.openpty + /bin/bash
+  SH-->>AG: 提示符输出
+  AG-->>DO: {"type":"data","id":"s1","data":"<b64>"}
+  DO-->>XT: 透传 → xterm 渲染
+  U->>XT: 键入 uname -a
+  XT->>DO: {"type":"data","id":"s1","data":"<b64>"}
+  DO->>AG: 透传
+  AG->>SH: 写入 stdin
+  SH-->>AG: 命令输出
+  AG-->>DO: data 帧
+  DO-->>XT: 渲染结果
+  Note over DO,AG: 任一端断线: 代理指数退避重连; spawn 的 shell 进程在服务器侧保留, 重连即恢复
