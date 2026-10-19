@@ -59,24 +59,29 @@ export CLOUDFLARE_ACCOUNT_ID=xxxx
 
 该 token 仅用于部署鉴权：代码不读取、不进仓库、不写入 wrangler.toml。
 
-## 线上部署记录（2026-10-18）
+## 线上部署记录（2026-10-19 更新：三端同步 + 国内外分流）
 
 | 项 | 值 |
 |---|---|
-| 应用（Workers） | https://dujiecode.dujie-nb.workers.dev |
-| 官网（Pages，同源 SPA） | https://dujiecode.pages.dev |
+| 应用（Workers，完整版） | https://dujiecode.dujie-nb.workers.dev |
+| 官网（CF Pages） | https://dujiecode.pages.dev |
+| 官网（GitHub Pages 国内镜像） | https://gjsvip.github.io/dujiecode/ |
+| 源码（GitHub 主仓库） | https://github.com/gjsvip/dujiecode |
+| 源码（Gitee 国内镜像） | https://gitee.com/dujie_nb_admin/dujiecode |
 | D1 数据库 | `dujiecode-db`（`52f270d9-1d75-41bc-9df1-95264224e91e`，10 张表已建） |
 | KV 命名空间 | `e8664fb54b174330be46abad29727a31` |
 | R2 桶 | `dujiecode-files` |
 | Secrets | `ENCRYPTION_KEY` / `JWT_SECRET` 已设置；明文备份见本地 `.deploy-secrets.txt`（**丢失=全部用户密钥不可解密，请妥善保管**） |
 | DO 迁移 | `v1`（`new_sqlite_classes: ["TerminalRoom"]`，免费计划要求） |
-| 必应收录 | IndexNow 已提交（key `51734a6916d2725aa31f3e62ef9a59b5`，202 Accepted）；sitemap：`/sitemap.xml`，robots：`/robots.txt` |
+| 国内外分流 | Worker 根路径按 `request.cf.country` 判定：CN → 302 国内镜像（`CN_MIRROR_URL`，当前 GitHub Pages）；`GET /api/region` 提供地域与入口信息 |
+| 必应收录 | IndexNow 已提交（key `51734a6916d2725aa31f3e62ef9a59b5`，202 Accepted）；sitemap：`/sitemap.xml`（含全部镜像入口），robots：`/robots.txt` |
 | 质量状态 | tsc 零错误；Vitest 64/64 通过；QA 独立审查通过（2 项缺陷已修复回归） |
+| 自动化 | push → 构建/测试/D1/Worker/Pages/GitHub Pages 全自动；Gitee 全量镜像自动同步 |
 
 ### 已知网络限制与备选
 
-`*.workers.dev` 在部分网络环境（如企业出口/部分沙箱）存在 SNI 层阻断，导致应用域名不可达。
-若遇此情况有两个备选（均可按需实施）：
+`*.workers.dev` 在部分网络环境（如企业出口/部分沙箱/国内部分运营商）存在 SNI 层阻断，导致应用域名不可达。国内外分流已缓解官网访问（国内走 GitHub Pages 镜像）；若需完整工作台在国内可达，有两个备选：
+
 1. **绑定自定义域名**：将任意已接入 Cloudflare 的域名添加 Worker 自定义域名路由（全球任播，无 workers.dev 限制）；
 2. **Pages Functions 全功能通道**：把同一份 `dist` + Hono 入口以 Pages Functions 形态部署（D1/KV/R2/DO 绑定可经 wrangler.toml 配置，DO 以 `script_name` 跨项目绑定至本 Worker），获得 `*.pages.dev` 域名的完整应用访问入口。
 
@@ -101,9 +106,21 @@ python3 dujie-agent.py --server wss://dujiecode.dujie-nb.workers.dev --backend-i
 | `scripts/` | `publish.sh`（一键双平台开源发布） |
 | `docs/` | PRD、架构设计、类图/时序图、CSDN 发布文章稿 |
 
-## 开源发布（国内 + 国外双平台）
+## 开源发布与多端部署（GitHub + Gitee + Cloudflare 三端同步）
 
-代码以 MIT 协议开源，采用 **GitHub 主力 + Gitee 国内镜像** 的双仓库策略：GitHub 保有完整历史，Gitee 镜像由 GitHub Actions 在每次 push 到 `main` 时自动同步（`git push --force --mirror`），两边数据始终一致。
+代码以 MIT 协议开源，**一次 push 同步三端**：GitHub（主仓库）→ Gitee（国内源码镜像）→ Cloudflare（Worker + Pages 部署），官网另发布 GitHub Pages 国内可达镜像。全流程由 GitHub Actions 自动完成。
+
+### 访问入口与国内外分流
+
+| 入口 | 地址 | 面向 | 更新方式 |
+|---|---|---|---|
+| Cloudflare 完整版 | https://dujiecode.dujie-nb.workers.dev | 海外 + 可直达 CF 的国内用户 | push 自动部署 |
+| CF Pages 官网 | https://dujiecode.pages.dev | 海外静态官网 | push 自动部署 |
+| GitHub Pages 镜像 | https://gjsvip.github.io/dujiecode/ | **国内网络推荐**（静态官网） | push 自动部署 |
+| Gitee 仓库 | https://gitee.com/dujie_nb_admin/dujiecode | 国内源码托管 | push 自动镜像 |
+| GitHub 仓库 | https://github.com/gjsvip/dujiecode | 源码主仓库 | — |
+
+**分流原理**：Cloudflare Worker 在官网根路径（`GET /`）依据访客 IP 地域（`request.cf.country`）实时判定——国内访客 302 跳转国内镜像（GitHub Pages，可经 `CN_MIRROR_URL` 环境变量切换为 Gitee Pages），海外访客留在 Cloudflare 完整版；仅拦截文档入口，SPA 子路由与静态资源不受影响。落地页另设「访问入口」导航区，并在探测到国内访客时展示推荐横幅（`GET /api/region`，免鉴权）。
 
 ### 一键发布
 
@@ -121,30 +138,33 @@ GITEE_USER=你的Gitee用户名 GITEE_TOKEN=xxx \
 
 脚本会自动完成：检查 git 状态 → 配置 `origin`（GitHub）与 `gitee`（Gitee）双 remote → 推送 `main` 分支 → 打印两个平台的仓库地址。
 
-### 自动同步部署（GitHub Actions → Cloudflare）
+### 自动同步部署（GitHub Actions）
 
-`.github/workflows/deploy.yml` 已内置完整 CI/CD 流水线：**push 到 `main` 即自动完成** 依赖安装 → 类型检查与构建 → 单元测试 → D1 初始化（幂等）→ Worker 部署 → Pages 官网部署。也可在仓库 Actions 页面手动 `Run workflow` 触发。
+`.github/workflows/deploy.yml` 内置完整 CI/CD 流水线：**push 到 `main` 即自动完成** 依赖安装 → 类型检查与构建 → 单元测试（64 用例）→ D1 初始化（幂等）→ Worker 部署 → CF Pages 官网部署 → GitHub Pages 国内镜像部署。也可在仓库 Actions 页面手动 `Run workflow` 触发。
 
-只需在 GitHub 仓库 **Settings → Secrets and variables → Actions** 添加两个 Secret：
+所需 Secret（仓库 **Settings → Secrets and variables → Actions**，本仓库已配置）：
 
 | Secret | 值 |
 |---|---|
 | `CF_API_TOKEN` | Cloudflare API Token（需 Workers / D1 / Pages 编辑权限） |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
-
-> 本仓库已完成配置并触发过部署，仓库地址：https://github.com/gjsvip/dujiecode
-
-### 自动镜像配置（GitHub Actions）
-
-`.github/workflows/mirror-to-gitee.yml` 已内置镜像工作流，只需在 GitHub 仓库
-**Settings → Secrets and variables → Actions** 中添加两个 Secret：
-
-| Secret | 值 |
-|---|---|
 | `GITEE_USER` | Gitee 用户名 |
 | `GITEE_TOKEN` | Gitee 个人访问令牌（需 `projects` 权限） |
 
-之后每次 `git push origin main` 都会自动同步到 Gitee。
+### Gitee 仓库镜像
+
+`.github/workflows/mirror-to-gitee.yml` 在每次 push 到 `main` 时以 `git push --force --mirror` 全量同步到 Gitee（自动移除 origin 跟踪引用，避免隐藏 ref 被拒）；未配置 Gitee 密钥时步骤优雅跳过，不影响其他部署。
+
+### 启用 Gitee Pages（国内直连官网，可选增强）
+
+Gitee Pages 需账户完成**实名认证**后在网页端一键启用（OpenAPI 暂不支持）：
+
+1. 登录 Gitee → 个人设置 → 实名认证（需身份证信息，约 1 个工作日）；
+2. 进入仓库 https://gitee.com/dujie_nb_admin/dujiecode → **服务 → Gitee Pages → 开始部署**；
+3. 部署分支选 `gh-pages`、目录选 `/`（该分支由 GitHub Actions 每次 push 自动更新，内容与 GitHub Pages 一致）；
+4. 启用后地址为 `https://dujie_nb_admin.gitee.io/dujiecode`；将 Worker 的 `CN_MIRROR_URL` 改为该地址并重新部署，国内分流即切换至 Gitee Pages。
+
+> 在实名认证完成前，国内分流目标为 GitHub Pages（`gjsvip.github.io/dujiecode`），国内可达性已验证（HTTP 200）。
 
 ### CSDN 发布
 
