@@ -121,6 +121,19 @@ GITEE_USER=你的Gitee用户名 GITEE_TOKEN=xxx \
 
 脚本会自动完成：检查 git 状态 → 配置 `origin`（GitHub）与 `gitee`（Gitee）双 remote → 推送 `main` 分支 → 打印两个平台的仓库地址。
 
+### 自动同步部署（GitHub Actions → Cloudflare）
+
+`.github/workflows/deploy.yml` 已内置完整 CI/CD 流水线：**push 到 `main` 即自动完成** 依赖安装 → 类型检查与构建 → 单元测试 → D1 初始化（幂等）→ Worker 部署 → Pages 官网部署。也可在仓库 Actions 页面手动 `Run workflow` 触发。
+
+只需在 GitHub 仓库 **Settings → Secrets and variables → Actions** 添加两个 Secret：
+
+| Secret | 值 |
+|---|---|
+| `CF_API_TOKEN` | Cloudflare API Token（需 Workers / D1 / Pages 编辑权限） |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
+
+> 本仓库已完成配置并触发过部署，仓库地址：https://github.com/gjsvip/dujiecode
+
 ### 自动镜像配置（GitHub Actions）
 
 `.github/workflows/mirror-to-gitee.yml` 已内置镜像工作流，只需在 GitHub 仓库

@@ -3,6 +3,7 @@
 # 配置方法（仓库 Settings > Secrets and variables > Actions）：
 #   GITEE_USER   = 你的 Gitee 用户名
 #   GITEE_TOKEN  = Gitee 个人访问令牌（用户设置 > 私人令牌，勾选 projects 权限）
+# 未配置以上 Secret 时本工作流自动跳过（不报失败）。
 name: mirror-to-gitee
 
 on:
@@ -12,6 +13,7 @@ on:
 
 jobs:
   mirror:
+    if: ${{ secrets.GITEE_USER != '' && secrets.GITEE_TOKEN != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with full history
