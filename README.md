@@ -44,7 +44,7 @@ wrangler secret put JWT_SECRET                  # openssl rand -hex 32
 ```bash
 npm ci
 npm run build      # tsc --noEmit + vite build（dist/ 内含 dujie-agent.py）
-npm run deploy     # wrangler deploy → dujiecode.dujie-nb.workers.dev
+npm run deploy     # wrangler deploy → dujie_cone.520691.xyz（345 账号自定义域名）
 npm run pages      # wrangler pages deploy dist --project-name dujiecode → dujiecode.pages.dev
 ```
 
@@ -59,22 +59,24 @@ export CLOUDFLARE_ACCOUNT_ID=xxxx
 
 该 token 仅用于部署鉴权：代码不读取、不进仓库、不写入 wrangler.toml。
 
-## 线上部署记录（2026-10-19 更新：三端同步 + 国内外分流）
+## 线上部署记录（2026-10-20 更新：345 CF 账号 + 520691.xyz 域名体系）
 
 | 项 | 值 |
 |---|---|
-| 应用（Workers，完整版） | https://dujiecode.dujie-nb.workers.dev |
+| 渡劫code 主域（Workers，完整版） | https://dujie_cone.520691.xyz （345 账号自定义域名，不跳转、直接服务） |
+| 个人官网 | https://www.520691.xyz （Cloudflare Pages，345 账号） |
+| 博客 | https://blog.520691.xyz （Cloudflare Pages + GitHub Pages 双通道） |
 | 官网（CF Pages） | https://dujiecode.pages.dev |
-| 官网（GitHub Pages 国内镜像） | https://gjsvip.github.io/dujiecode/ |
+| 官网（GitHub Pages 国内镜像） | https://gjsvip.github.io/ |
 | 源码（GitHub 主仓库） | https://github.com/gjsvip/dujiecode |
 | 源码（Gitee 国内镜像） | https://gitee.com/dujie_nb_admin/dujiecode |
-| D1 数据库 | `dujiecode-db`（`52f270d9-1d75-41bc-9df1-95264224e91e`，10 张表已建） |
-| KV 命名空间 | `e8664fb54b174330be46abad29727a31` |
-| R2 桶 | `dujiecode-files` |
+| CF 账号 | **345 账号**（3450211748@qq.com，`f608546bec281f207409d11f3be5c89d`）；旧 dujie_nb 账号（`83839c2e49b7e273cf56aa66fe5aed51`）已弃用 |
+| D1 数据库 | `dujiecode-db`（345 账号新建，schema 幂等初始化；旧库空表无数据，无需迁移） |
+| KV 命名空间 / R2 桶 | `dujiecode-kv` / `dujiecode-files`（345 账号新建） |
 | Secrets | `ENCRYPTION_KEY` / `JWT_SECRET` 已设置；明文备份见本地 `.deploy-secrets.txt`（**丢失=全部用户密钥不可解密，请妥善保管**） |
 | DO 迁移 | `v1`（`new_sqlite_classes: ["TerminalRoom"]`，免费计划要求） |
-| 国内外分流 | Worker 根路径按 `request.cf.country` 判定：CN → 302 国内镜像（`CN_MIRROR_URL`，当前 GitHub Pages）；`GET /api/region` 提供地域与入口信息 |
-| 必应收录 | IndexNow 已提交（key `51734a6916d2725aa31f3e62ef9a59b5`，202 Accepted）；sitemap：`/sitemap.xml`（含全部镜像入口），robots：`/robots.txt` |
+| 国内外分流 | Worker **不做服务端跳转**，所有访客直达；`GET /api/region` 提供地域与入口信息，国内访客仅在落地页顶部看到镜像推荐条（软提示） |
+| 必应收录 | IndexNow 已提交全部域名（key `51734a6916d2725aa31f3e62ef9a59b5`，202 Accepted）；sitemap：`/sitemap.xml`（含全部镜像入口），robots：`/robots.txt` |
 | 质量状态 | tsc 零错误；Vitest 64/64 通过；QA 独立审查通过（2 项缺陷已修复回归） |
 | 自动化 | push → 构建/测试/D1/Worker/Pages/GitHub Pages 全自动；Gitee 全量镜像自动同步 |
 
@@ -88,8 +90,8 @@ export CLOUDFLARE_ACCOUNT_ID=xxxx
 远程执行代理一键安装
 
 ```bash
-curl -fsSL https://dujiecode.pages.dev/dujie-agent.py -o dujie-agent.py
-python3 dujie-agent.py --server wss://dujiecode.dujie-nb.workers.dev --backend-id bk_xxx --token djt_xxx
+curl -fsSL https://dujie_cone.520691.xyz/dujie-agent.py -o dujie-agent.py
+python3 dujie-agent.py --server wss://dujie_cone.520691.xyz --backend-id bk_xxx --token djt_xxx
 # 开机自启：sudo python3 dujie-agent.py --print-systemd
 ```
 
@@ -108,19 +110,21 @@ python3 dujie-agent.py --server wss://dujiecode.dujie-nb.workers.dev --backend-i
 
 ## 开源发布与多端部署（GitHub + Gitee + Cloudflare 三端同步）
 
-代码以 MIT 协议开源，**一次 push 同步三端**：GitHub（主仓库）→ Gitee（国内源码镜像）→ Cloudflare（Worker + Pages 部署），官网另发布 GitHub Pages 国内可达镜像。全流程由 GitHub Actions 自动完成。
+代码以 MIT 协议开源，**一次 push 同步三端**：GitHub（主仓库）→ Gitee（国内源码镜像）→ Cloudflare（345 账号 Worker + Pages 部署），官网另发布 GitHub Pages 国内可达镜像。全流程由 GitHub Actions 自动完成。
 
-### 访问入口与国内外分流
+### 域名体系（520691.xyz，345 CF 账号）
 
-| 入口 | 地址 | 面向 | 更新方式 |
-|---|---|---|---|
-| Cloudflare 完整版 | https://dujiecode.dujie-nb.workers.dev | 海外 + 可直达 CF 的国内用户 | push 自动部署 |
-| CF Pages 官网 | https://dujiecode.pages.dev | 海外静态官网 | push 自动部署 |
-| GitHub Pages 镜像 | https://gjsvip.github.io/dujiecode/ | **国内网络推荐**（静态官网） | push 自动部署 |
-| Gitee 仓库 | https://gitee.com/dujie_nb_admin/dujiecode | 国内源码托管 | push 自动镜像 |
-| GitHub 仓库 | https://github.com/gjsvip/dujiecode | 源码主仓库 | — |
+| 入口 | 地址 | 说明 |
+|---|---|---|
+| 渡劫code 主域 | https://dujie_cone.520691.xyz | Worker 自定义域名，完整版工作台，**不跳转直达** |
+| 个人官网 | https://www.520691.xyz | gjsvip 小开发者主页 + 友链导航 |
+| 博客 | https://blog.520691.xyz | 开发手记（CF Pages + GitHub Pages 双通道） |
+| CF Pages 官网 | https://dujiecode.pages.dev | 静态官网镜像 |
+| GitHub Pages 镜像 | https://gjsvip.github.io/ | 国内直连稳定的官网镜像 |
+| Gitee 仓库 | https://gitee.com/dujie_nb_admin/dujiecode | 国内源码托管 + Pages（实名后启用） |
+| GitHub 仓库 | https://github.com/gjsvip/dujiecode | 源码主仓库，push 即自动部署全部端 |
 
-**分流原理**：Cloudflare Worker 在官网根路径（`GET /`）依据访客 IP 地域（`request.cf.country`）实时判定——国内访客 302 跳转国内镜像（GitHub Pages，可经 `CN_MIRROR_URL` 环境变量切换为 Gitee Pages），海外访客留在 Cloudflare 完整版；仅拦截文档入口，SPA 子路由与静态资源不受影响。落地页另设「访问入口」导航区，并在探测到国内访客时展示推荐横幅（`GET /api/region`，免鉴权）。
+**分流策略**：Worker **不做服务端跳转**——所有访客（含国内）统一由主域 `dujie_cone.520691.xyz` 直接服务；国内访客仅在落地页顶部看到镜像推荐条（软提示，`GET /api/region` 免鉴权端点提供地域与入口信息），可自行选择 GitHub Pages / Gitee 镜像加速。
 
 ### 一键发布
 
@@ -146,10 +150,13 @@ GITEE_USER=你的Gitee用户名 GITEE_TOKEN=xxx \
 
 | Secret | 值 |
 |---|---|
-| `CF_API_TOKEN` | Cloudflare API Token（需 Workers / D1 / Pages 编辑权限） |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
+| `CF_API_TOKEN` | Cloudflare API Token（**345 账号**，需 Workers / D1 / KV / R2 / Pages 编辑权限） |
+| `CLOUDFLARE_ACCOUNT_ID` | `f608546bec281f207409d11f3be5c89d`（345 账号） |
+| `SITE_DEPLOY_TOKEN` | 有 repo 权限的 PAT（推送到 GitHub Pages 镜像仓库 `gjsvip/gjsvip.github.io`） |
 | `GITEE_USER` | Gitee 用户名 |
 | `GITEE_TOKEN` | Gitee 个人访问令牌（需 `projects` 权限） |
+
+> 博客仓库 `gjsvip/blog` 与官网仓库 `gjsvip/homepage` 另需 `CF_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`（345 账号）用于 Cloudflare Pages 部署。
 
 ### Gitee 仓库镜像
 
@@ -161,10 +168,9 @@ Gitee Pages 需账户完成**实名认证**后在网页端一键启用（OpenAPI
 
 1. 登录 Gitee → 个人设置 → 实名认证（需身份证信息，约 1 个工作日）；
 2. 进入仓库 https://gitee.com/dujie_nb_admin/dujiecode → **服务 → Gitee Pages → 开始部署**；
-3. 部署分支选 `gh-pages`、目录选 `/`（该分支由 GitHub Actions 每次 push 自动更新，内容与 GitHub Pages 一致）；
-4. 启用后地址为 `https://dujie_nb_admin.gitee.io/dujiecode`；将 Worker 的 `CN_MIRROR_URL` 改为该地址并重新部署，国内分流即切换至 Gitee Pages。
+3. 启用后地址为 `https://dujie_nb_admin.gitee.io/dujiecode`，可作为 GitHub Pages 之外的备用国内入口。
 
-> 在实名认证完成前，国内分流目标为 GitHub Pages（`gjsvip.github.io/dujiecode`），国内可达性已验证（HTTP 200）。
+> 在实名认证完成前，国内可达入口为 GitHub Pages 镜像 `https://gjsvip.github.io/`（HTTP 200 已验证）；渡劫code 主域 `dujie_cone.520691.xyz` 由 Cloudflare 全球任播承载。
 
 ### CSDN 发布
 

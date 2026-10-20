@@ -15,19 +15,19 @@ import { Link } from 'react-router-dom'
 
 /** 一键安装命令（§8.1：Pages 与 Workers 同源发布，publicDir=agent 复制进 dist 根） */
 const INSTALL_COMMAND =
-  'curl -fsSL https://dujiecode.pages.dev/dujie-agent.py -o dujie-agent.py'
+  'curl -fsSL https://dujie_cone.520691.xyz/dujie-agent.py -o dujie-agent.py'
 /** 代理运行命令（§8.1；token 在设置页创建后端时仅展示一次） */
 const RUN_COMMAND =
-  'python3 dujie-agent.py --server wss://dujiecode.dujie-nb.workers.dev --backend-id bk_你的后端ID --token djt_你的令牌'
+  'python3 dujie-agent.py --server wss://dujie_cone.520691.xyz --backend-id bk_你的后端ID --token djt_你的令牌'
 
 /**
- * 工作台入口基址（§12-D2 国内外分流）：
- * 静态镜像站（GitHub Pages 等）构建时经 VITE_APP_URL 指向 Worker 绝对地址；
+ * 工作台入口基址（§12-D2）：
+ * 静态镜像站（GitHub Pages 等）构建时经 VITE_APP_URL 指向主域绝对地址；
  * 默认空串 = 同源 SPA 路由（Cloudflare 同源部署时）。
  */
 const APP_URL: string = (import.meta.env.VITE_APP_URL ?? '').replace(/\/+$/, '')
 
-/** 访问入口总表（主域 + 多端部署 + 双源码托管，§12-D2） */
+/** 访问入口总表（主域 dujie_cone.520691.xyz + 多端部署 + 双源码托管，§12-D2） */
 const MIRROR_LINKS: readonly {
   label: string
   url: string
@@ -37,22 +37,28 @@ const MIRROR_LINKS: readonly {
 }[] = [
   {
     label: '渡劫code 主域',
-    url: 'https://gjsvip.github.io',
+    url: 'https://dujie_cone.520691.xyz',
     region: '主域',
-    note: '官网主入口，干净域名无路径，国内外均可访问',
+    note: '官网唯一主入口，Cloudflare 自定义域名，国内外可达，工作台完整功能',
     primary: true,
   },
   {
-    label: 'Cloudflare 完整版',
-    url: 'https://dujiecode.dujie-nb.workers.dev',
-    region: '海外',
-    note: 'Worker + D1 + R2 + DO，功能最全，工作台入口',
+    label: '个人官网',
+    url: 'https://www.520691.xyz',
+    region: '主域',
+    note: 'gjsvip 小开发者主页：项目介绍与友链导航',
   },
   {
-    label: 'CF Pages 官网',
-    url: 'https://dujiecode.pages.dev',
-    region: '海外',
-    note: 'Cloudflare Pages 静态官网',
+    label: '渡劫手记博客',
+    url: 'https://blog.520691.xyz',
+    region: '主域',
+    note: '开发手记、三端同步架构实录',
+  },
+  {
+    label: 'GitHub Pages 镜像',
+    url: 'https://gjsvip.github.io',
+    region: '国内',
+    note: 'GitHub Pages 官网镜像，国内直连稳定',
   },
   {
     label: 'Gitee 仓库',
@@ -752,8 +758,9 @@ function MirrorSection(): ReactNode {
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-2xl font-bold tracking-wide sm:text-3xl">访问入口</h2>
           <p className="mt-4 text-sm leading-relaxed text-dim sm:text-base">
-            一个主域、多端部署：<span className="font-medium text-text">gjsvip.github.io</span> 为官网主入口（干净域名、国内外可达），
-            Cloudflare 提供完整版工作台，源码双托管（GitHub 主库 + Gitee 国内镜像）自动同步。
+            一个主域、多端部署：<span className="font-medium text-text">dujie_cone.520691.xyz</span> 为渡劫code
+            唯一主入口（Cloudflare 自定义域名、国内外可达、工作台完整功能），
+            个人官网与博客同域协作，源码双托管（GitHub 主库 + Gitee 国内镜像）自动同步。
           </p>
         </div>
 
@@ -789,14 +796,21 @@ function MirrorSection(): ReactNode {
         </div>
 
         <p className="mx-auto mt-6 max-w-3xl text-center text-[11px] leading-relaxed text-dim">
-          博客已更新并迁至{' '}
+          个人官网{' '}
           <a
-            href="https://gjsvip.github.io/blog/"
+            href="https://www.520691.xyz/"
             className="text-accent underline decoration-accent/40 underline-offset-2"
           >
-            gjsvip.github.io/blog/
+            www.520691.xyz
           </a>
-          ；所有入口内容同源同步，push 一次全部更新。
+          {' '}与博客{' '}
+          <a
+            href="https://blog.520691.xyz/"
+            className="text-accent underline decoration-accent/40 underline-offset-2"
+          >
+            blog.520691.xyz
+          </a>
+          {' '}同属 520691.xyz 域名体系；所有入口内容同源同步，push 一次全部更新。
         </p>
       </div>
     </section>

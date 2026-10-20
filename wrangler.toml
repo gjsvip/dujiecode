@@ -3,19 +3,28 @@ main = "worker/index.ts"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
+# 345 CF 账号（3450211748@qq.com，f608546bec281f207409d11f3be5c89d）
+# 2026-10-20 起主账号；旧 dujie_nb 账号（83839c2e49b7e273cf56aa66fe5aed51）弃用
+account_id = "f608546bec281f207409d11f3be5c89d"
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
+# 主域自定义域名（345 账号 520691.xyz zone，Cloudflare 自动管理 DNS 与 TLS）
+routes = [
+  { pattern = "dujie_cone.520691.xyz", custom_domain = true }
+]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "dujiecode-db"
-database_id = "52f270d9-1d75-41bc-9df1-95264224e91e"
+database_id = "PENDING_345_D1_ID"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "e8664fb54b174330be46abad29727a31"
+id = "PENDING_345_KV_ID"
 
 [[r2_buckets]]
 binding = "R2"
@@ -31,7 +40,7 @@ new_sqlite_classes = ["TerminalRoom"]
 
 [vars]
 ENVIRONMENT = "production"
-APP_ORIGIN = "https://dujiecode.dujie-nb.workers.dev"
+APP_ORIGIN = "https://dujie_cone.520691.xyz"
 MAX_AGENT_ROUNDS = "25"
 SSE_KEEPALIVE_SEC = "15"
 
@@ -41,5 +50,5 @@ SSE_KEEPALIVE_SEC = "15"
 CN_MIRROR_URL = "https://gjsvip.github.io/"
 
 # 多镜像 CORS 白名单（逗号分隔）：静态镜像站上的页面可跨源调用公开接口。
-# Gitee Pages 启用后将其 origin 追加至此（如 ,https://dujie_nb_admin.gitee.io）。
-CORS_ORIGINS = "https://gjsvip.github.io,https://dujiecode.pages.dev,https://dujie_nb_admin.gitee.io"
+# 覆盖 520691.xyz 域名体系（主域/官网/博客）+ GitHub Pages + CF Pages + Gitee Pages。
+CORS_ORIGINS = "https://dujie_cone.520691.xyz,https://www.520691.xyz,https://blog.520691.xyz,https://gjsvip.github.io,https://dujiecode.pages.dev,https://dujie_nb_admin.gitee.io"

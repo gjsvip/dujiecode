@@ -36,12 +36,18 @@ export { TerminalRoom } from '../do/terminal-room'
 /* （不做服务端跳转，所有访客统一由本 Worker 直接服务）                     */
 /* ------------------------------------------------------------------ */
 
+/** 主域（345 CF 账号自定义域名，官网唯一主入口） */
+const MAIN_DOMAIN = 'https://dujie_cone.520691.xyz'
 /** 国内镜像地址（GitHub Pages，国内可达且免实名认证；可切换为 Gitee Pages） */
 const DEFAULT_CN_MIRROR = 'https://gjsvip.github.io/'
 /** Gitee Pages 预期地址（账户完成实名认证并在仓库「服务 → Gitee Pages」启用后生效） */
 const GITEE_PAGES_MIRROR = 'https://dujie_nb_admin.gitee.io/dujiecode'
 /** CF Pages 官网镜像（静态版，海外可达） */
 const CF_PAGES_MIRROR = 'https://dujiecode.pages.dev'
+/** 个人官网（520691.xyz 域名体系） */
+const HOMEPAGE_URL = 'https://www.520691.xyz'
+/** 博客（520691.xyz 域名体系） */
+const BLOG_URL = 'https://blog.520691.xyz'
 
 /* ------------------------------------------------------------------ */
 /* Hono 应用与统一 JSON 错误响应助手                                     */
@@ -283,15 +289,19 @@ app.route('/api', backendRoutes)
 // 静态镜像（GitHub Pages 等） fetch 失败时静默降级为静态镜像列表。
 app.get('/api/region', (c) => {
   const country = c.req.raw.cf?.country ?? 'unknown'
+  const appUrl = readEnvVar(c.env, 'APP_ORIGIN', '') || MAIN_DOMAIN
   return c.json({
     country,
     cnMirror: readEnvVar(c.env, 'CN_MIRROR_URL', DEFAULT_CN_MIRROR),
-    appUrl: readEnvVar(c.env, 'APP_ORIGIN', ''),
+    appUrl,
     mirrors: {
-      cloudflare: readEnvVar(c.env, 'APP_ORIGIN', ''),
+      main: appUrl,
+      cloudflare: appUrl,
       cfPages: CF_PAGES_MIRROR,
       githubPages: DEFAULT_CN_MIRROR,
       giteePages: GITEE_PAGES_MIRROR,
+      homepage: HOMEPAGE_URL,
+      blog: BLOG_URL,
     },
   })
 })
