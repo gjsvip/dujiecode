@@ -12,12 +12,14 @@ directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# 主域自定义域名（345 账号 520691.xyz zone）。
-# 注意：需先在 zone 创建 DNS 记录 dujie_cone CNAME dujiecode.<账号子域>.workers.dev（proxy 开）。
-# DNS 记录就绪后取消下行注释并重新部署，wrangler 会自动完成域名绑定与 TLS。
-# routes = [
-#   { pattern = "dujie_cone.520691.xyz", custom_domain = true }
-# ]
+# 主域路由（345 账号 520691.xyz zone）。
+# DNS：dujie_cone CNAME dujiecode.dujie.workers.dev（proxied=true，2026-10-20 已建）。
+# 绑定方式：zone 级 Worker 路由（POST /zones/{zone_id}/workers/routes 已建立）——
+# workers/domains API 对所有令牌类型均返回 10405，故 custom_domain 模式不可用，
+# 改用普通 route pattern（等效：请求到达 CF 边缘后按 pattern 匹配执行 Worker）。
+routes = [
+  { pattern = "dujie_cone.520691.xyz/*" }
+]
 
 [[d1_databases]]
 binding = "DB"

@@ -43,7 +43,7 @@ const DEFAULT_CN_MIRROR = 'https://gjsvip.github.io/'
 /** Gitee Pages 预期地址（账户完成实名认证并在仓库「服务 → Gitee Pages」启用后生效） */
 const GITEE_PAGES_MIRROR = 'https://dujie_nb_admin.gitee.io/dujiecode'
 /** CF Pages 官网镜像（静态版，海外可达） */
-const CF_PAGES_MIRROR = 'https://dujiecode.pages.dev'
+const CF_PAGES_MIRROR = 'https://dujiecode-9ka.pages.dev'
 /** 个人官网（520691.xyz 域名体系） */
 const HOMEPAGE_URL = 'https://www.520691.xyz'
 /** 博客（520691.xyz 域名体系） */
