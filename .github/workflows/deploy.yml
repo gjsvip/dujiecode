@@ -72,6 +72,16 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Update gh-pages branch (Gitee Pages 国内镜像源)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_message: "deploy: gh-pages ${{ github.sha }}"
+
       - name: Summary
         run: |
           echo "### 部署完成 :rocket:" >> $GITHUB_STEP_SUMMARY
@@ -79,7 +89,7 @@ jobs:
           echo "| 目标 | 地址 |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
           echo "| 渡劫code 主域 | https://dujie_cone.520691.xyz |" >> $GITHUB_STEP_SUMMARY
-          echo "| Pages 官网 | https://dujiecode.pages.dev |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pages 官网 | https://dujiecode-9ka.pages.dev |" >> $GITHUB_STEP_SUMMARY
           echo "| 提交 | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
 
   # GitHub Pages 镜像（§12-D2）：发布到用户站点 gjsvip.github.io（国内可达镜像）。

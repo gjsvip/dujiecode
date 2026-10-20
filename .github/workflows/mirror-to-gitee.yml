@@ -26,10 +26,18 @@ jobs:
             echo "未配置 GITEE_USER / GITEE_TOKEN，跳过 Gitee 镜像（配置后自动生效）"
             exit 0
           fi
-          # 移除 origin 跟踪引用，避免 --mirror 推送 refs/remotes/* 被 Gitee 拒绝
+          # 移除 origin 跟踪引用，避免推送 refs/remotes/* 被 Gitee 拒绝
           git remote remove origin || true
           git remote add gitee "https://$GITEE_USER:$GITEE_TOKEN@gitee.com/$GITEE_USER/dujiecode.git"
-          git push --force --mirror gitee
+          # 只同步 main 与 gh-pages（Gitee Pages 国内镜像部署分支）。
+          # 不用 --mirror：完整镜像会删除 Gitee 侧 Pages 部署所需的 gh-pages 分支，
+          # 且 Gitee 仓库开启 Pages 服务后该分支必须常驻。
+          git push --force gitee main:main
+          if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+            git push --force gitee origin/gh-pages:gh-pages
+          else
+            echo "仓库无 gh-pages 分支，跳过（由 deploy.yml 的 deploy-gitee-source job 生成）"
+          fi
         env:
           GITEE_USER: ${{ secrets.GITEE_USER }}
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
