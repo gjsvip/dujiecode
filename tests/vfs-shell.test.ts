@@ -175,6 +175,7 @@ function createEnv(): { env: Env; db: MockD1; r2: MockR2 } {
   const r2 = new MockR2()
   const env = {
     DB: db as unknown as D1Database,
+    BLOG_DB: {} as D1Database,
     KV: {} as KVNamespace,
     R2: r2 as unknown as R2Bucket,
     TERMINAL_ROOM: {} as DurableObjectNamespace,

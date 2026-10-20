@@ -20,8 +20,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch gh-pages (deploy job 可能刚生成)
-        run: git fetch origin '+refs/heads/gh-pages:refs/remotes/origin/gh-pages' || echo "gh-pages 尚不存在，跳过"
+      - name: Fetch gh-pages (deploy job 可能刚生成，最多等待 2 分钟)
+        run: |
+          for i in $(seq 1 12); do
+            if git fetch origin '+refs/heads/gh-pages:refs/remotes/origin/gh-pages' 2>/dev/null; then
+              echo "gh-pages 已就绪"; exit 0
+            fi
+            echo "等待 gh-pages 生成… ($i/12)"; sleep 10
+          done
+          echo "gh-pages 等待超时，跳过"
 
       - name: Mirror to Gitee
         run: |

@@ -28,6 +28,7 @@ import workspaceRoutes from './routes/workspaces'
 import shellRoutes from './routes/shell'
 import conversationRoutes from './routes/conversations'
 import backendRoutes from './routes/backends'
+import blogRoutes from './routes/blog'
 /* Durable Object 必须从 Worker 入口导出，wrangler 据此识别绑定类（部署集成要求） */
 export { TerminalRoom } from '../do/terminal-room'
 
@@ -183,6 +184,13 @@ const AUTH_EXEMPTIONS: ReadonlyArray<{ method: string; path: string }> = [
   { method: 'GET', path: '/api/agent/connect' },
   // 地域与镜像信息（§12-D2 国内外分流）：落地页免登录获取访客国家与推荐入口
   { method: 'GET', path: '/api/region' },
+  // 博客互动（公开数据：评论/点赞/浏览量/说说，三端静态站共用，防刷靠限流与指纹）
+  { method: 'GET', path: '/api/blog/comments' },
+  { method: 'POST', path: '/api/blog/comments' },
+  { method: 'POST', path: '/api/blog/like' },
+  { method: 'POST', path: '/api/blog/view' },
+  { method: 'GET', path: '/api/blog/stats' },
+  { method: 'GET', path: '/api/blog/says' },
 ]
 
 /** api 限流 KV 计数 TTL（秒）：120s 覆盖前后两个分钟桶，保证窗口滑动 */
@@ -284,6 +292,8 @@ app.route('/api/workspaces', shellRoutes)
 app.route('/api', conversationRoutes)
 // 执行后端 / agent token / WS 升级（§8）：挂 /api，含 /terminal/connect、/agent/connect
 app.route('/api', backendRoutes)
+// 博客互动（评论/点赞/浏览量/说说，公开免鉴权，数据存 BLOG_DB）
+app.route('/api/blog', blogRoutes)
 
 // 地域与镜像信息（§12-D2）：免鉴权。落地页据此展示「国内/海外推荐入口」提示，
 // 静态镜像（GitHub Pages 等） fetch 失败时静默降级为静态镜像列表。

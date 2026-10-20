@@ -56,3 +56,9 @@ CN_MIRROR_URL = "https://gjsvip.github.io/"
 # 多镜像 CORS 白名单（逗号分隔）：静态镜像站上的页面可跨源调用公开接口。
 # 覆盖 520691.xyz 域名体系（主域/官网/博客）+ GitHub Pages + CF Pages + Gitee Pages。
 CORS_ORIGINS = "https://dujie_cone.520691.xyz,https://www.520691.xyz,https://blog.520691.xyz,https://gjsvip.github.io,https://dujiecode.pages.dev,https://dujie_nb_admin.gitee.io"
+
+# 博客互动库（评论/点赞/浏览量/说说，三端静态站共用 API）
+[[d1_databases]]
+binding = "BLOG_DB"
+database_name = "gjsvip-blog-db"
+database_id = "b48171d1-799e-4f2c-821a-7ee295db4ff0"

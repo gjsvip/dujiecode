@@ -6,6 +6,8 @@
 export interface Env {
   /** D1 数据库：用户 / 供应商 / 目录树 / 消息 / 审批 / 审计 / 后端元数据 */
   DB: D1Database
+  /** D1 数据库：博客互动（评论 / 点赞 / 浏览量 / 说说，三端静态站共用） */
+  BLOG_DB: D1Database
   /** Workers KV：会话 / 限流 / 中止 / 放行名单（§4.3 Key 规范） */
   KV: KVNamespace
   /** R2 对象存储：工作区文件内容（Key：ws/{workspaceId}/{path}） */
