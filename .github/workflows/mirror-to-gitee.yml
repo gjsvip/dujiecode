@@ -20,6 +20,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch gh-pages (deploy job 可能刚生成)
+        run: git fetch origin '+refs/heads/gh-pages:refs/remotes/origin/gh-pages' || echo "gh-pages 尚不存在，跳过"
+
       - name: Mirror to Gitee
         run: |
           if [ -z "$GITEE_USER" ] || [ -z "$GITEE_TOKEN" ]; then
