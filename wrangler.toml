@@ -35,10 +35,10 @@ APP_ORIGIN = "https://dujiecode.dujie-nb.workers.dev"
 MAX_AGENT_ROUNDS = "25"
 SSE_KEEPALIVE_SEC = "15"
 
-# 国内外分流（§12-D2）：国内访客访问官网根路径时 302 到国内镜像。
-# 当前指向 GitHub Pages（国内可达、免实名）；Gitee Pages 启用后改为：
+# 国内镜像地址（§12-D2）：落地页「访问入口」向国内访客提示用；
+# 不做服务端跳转（访问本 Worker 不跳转）。可切换为 Gitee Pages：
 # CN_MIRROR_URL = "https://dujie_nb_admin.gitee.io/dujiecode"
-CN_MIRROR_URL = "https://gjsvip.github.io/dujiecode/"
+CN_MIRROR_URL = "https://gjsvip.github.io/"
 
 # 多镜像 CORS 白名单（逗号分隔）：静态镜像站上的页面可跨源调用公开接口。
 # Gitee Pages 启用后将其 origin 追加至此（如 ,https://dujie_nb_admin.gitee.io）。

@@ -27,26 +27,32 @@ const RUN_COMMAND =
  */
 const APP_URL: string = (import.meta.env.VITE_APP_URL ?? '').replace(/\/+$/, '')
 
-/** 访问入口总表（国内外分流 + 双源码托管，§12-D2） */
+/** 访问入口总表（主域 + 多端部署 + 双源码托管，§12-D2） */
 const MIRROR_LINKS: readonly {
   label: string
   url: string
-  region: '国内' | '海外' | '源码'
+  region: '主域' | '国内' | '海外' | '源码'
   note: string
   primary?: boolean
 }[] = [
+  {
+    label: '渡劫code 主域',
+    url: 'https://gjsvip.github.io',
+    region: '主域',
+    note: '官网主入口，干净域名无路径，国内外均可访问',
+    primary: true,
+  },
   {
     label: 'Cloudflare 完整版',
     url: 'https://dujiecode.dujie-nb.workers.dev',
     region: '海外',
     note: 'Worker + D1 + R2 + DO，功能最全，工作台入口',
-    primary: true,
   },
   {
-    label: 'GitHub Pages 镜像',
-    url: 'https://gjsvip.github.io/dujiecode/',
-    region: '国内',
-    note: '静态官网，国内网络推荐，免实名即可访问',
+    label: 'CF Pages 官网',
+    url: 'https://dujiecode.pages.dev',
+    region: '海外',
+    note: 'Cloudflare Pages 静态官网',
   },
   {
     label: 'Gitee 仓库',
@@ -58,7 +64,7 @@ const MIRROR_LINKS: readonly {
     label: 'GitHub 仓库',
     url: 'https://github.com/gjsvip/dujiecode',
     region: '源码',
-    note: '主仓库，push 即自动部署三端',
+    note: '主仓库，push 即自动部署全部端',
   },
 ]
 
@@ -376,7 +382,7 @@ function Hero(): ReactNode {
         </div>
 
         <p className="mt-6 text-xs text-dim">
-          部署于 Cloudflare Workers · 国内外多镜像自动分流 · 数据按账号隔离
+          主域直达 · 多端镜像备份 · 数据按账号隔离
         </p>
 
         <ProductPreview />
@@ -732,10 +738,10 @@ function QuickStart(): ReactNode {
   )
 }
 
-/** 访问入口（国内外分流，§12-D2）：Cloudflare 侧按访客地域自动 302，
- *  静态镜像站展示全量入口列表，保证任何网络下官网可达 */
+/** 访问入口（主域 + 多端部署，§12-D2）：统一入口导航，不做强制跳转 */
 function MirrorSection(): ReactNode {
-  const regionStyle: Record<'国内' | '海外' | '源码', string> = {
+  const regionStyle: Record<'主域' | '国内' | '海外' | '源码', string> = {
+    主域: 'border-accent/50 text-accent',
     国内: 'border-ok/40 text-ok',
     海外: 'border-accent/40 text-accent',
     源码: 'border-border text-dim',
@@ -746,8 +752,8 @@ function MirrorSection(): ReactNode {
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-2xl font-bold tracking-wide sm:text-3xl">访问入口</h2>
           <p className="mt-4 text-sm leading-relaxed text-dim sm:text-base">
-            三端同步、按地域自动分流：国内访客访问 Cloudflare 官网时将自动前往国内镜像，
-            海外访客留在 Cloudflare 完整版；源码双托管（GitHub 主库 + Gitee 国内镜像）。
+            一个主域、多端部署：<span className="font-medium text-text">gjsvip.github.io</span> 为官网主入口（干净域名、国内外可达），
+            Cloudflare 提供完整版工作台，源码双托管（GitHub 主库 + Gitee 国内镜像）自动同步。
           </p>
         </div>
 
@@ -783,8 +789,14 @@ function MirrorSection(): ReactNode {
         </div>
 
         <p className="mx-auto mt-6 max-w-3xl text-center text-[11px] leading-relaxed text-dim">
-          分流由 Cloudflare Worker 依据访客 IP 地域（<span className="font-mono">request.cf.country</span>）实时判定，
-          仅对官网根路径生效；能直达 Cloudflare 的国内用户仍可正常使用工作台。
+          博客已更新并迁至{' '}
+          <a
+            href="https://gjsvip.github.io/blog/"
+            className="text-accent underline decoration-accent/40 underline-offset-2"
+          >
+            gjsvip.github.io/blog/
+          </a>
+          ；所有入口内容同源同步，push 一次全部更新。
         </p>
       </div>
     </section>

@@ -32,11 +32,12 @@ import backendRoutes from './routes/backends'
 export { TerminalRoom } from '../do/terminal-room'
 
 /* ------------------------------------------------------------------ */
-/* 国内外分流（§12-D2）：镜像地址常量 + /api/region + 官网根路径 geo 302   */
+/* 镜像信息（§12-D2）：/api/region 供落地页展示国内/海外推荐入口           */
+/* （不做服务端跳转，所有访客统一由本 Worker 直接服务）                     */
 /* ------------------------------------------------------------------ */
 
-/** 国内镜像默认地址（GitHub Pages，国内可达且免实名认证；Gitee Pages 启用后经 CN_MIRROR_URL 覆盖） */
-const DEFAULT_CN_MIRROR = 'https://gjsvip.github.io/dujiecode/'
+/** 国内镜像地址（GitHub Pages，国内可达且免实名认证；可切换为 Gitee Pages） */
+const DEFAULT_CN_MIRROR = 'https://gjsvip.github.io/'
 /** Gitee Pages 预期地址（账户完成实名认证并在仓库「服务 → Gitee Pages」启用后生效） */
 const GITEE_PAGES_MIRROR = 'https://dujie_nb_admin.gitee.io/dujiecode'
 /** CF Pages 官网镜像（静态版，海外可达） */
@@ -340,16 +341,8 @@ const worker: ExportedHandler<Env> = {
     if (url.pathname.startsWith('/api/')) {
       return app.fetch(request, env, ctx)
     }
-    // 国内外分流（§12-D2）：国内访客访问官网根路径 → 302 跳转国内镜像。
-    // 仅拦截文档入口（GET / 与 /index.html）；SPA 子路由与静态资源不受影响，
-    // 能直达 Cloudflare 的国内用户仍可正常使用工作台。
-    if (
-      request.method === 'GET' &&
-      (url.pathname === '/' || url.pathname === '/index.html') &&
-      request.cf?.country === 'CN'
-    ) {
-      return Response.redirect(readEnvVar(env, 'CN_MIRROR_URL', DEFAULT_CN_MIRROR), 302)
-    }
+    // 不做地域跳转：所有访客（含国内）统一由本 Worker 直接服务，
+    // 国内可达镜像入口经落地页「访问入口」导航区与 /api/region 提示自行选择。
     try {
       // 静态资源 / SPA 回退（index.html）；ASSETS 对不存在路径按
       // not_found_handling 配置返回 index.html（GET）或 405（非 GET）
