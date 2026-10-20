@@ -12,19 +12,21 @@ directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# 主域自定义域名（345 账号 520691.xyz zone，Cloudflare 自动管理 DNS 与 TLS）
-routes = [
-  { pattern = "dujie_cone.520691.xyz", custom_domain = true }
-]
+# 主域自定义域名（345 账号 520691.xyz zone）。
+# 注意：需先在 zone 创建 DNS 记录 dujie_cone CNAME dujiecode.<账号子域>.workers.dev（proxy 开）。
+# DNS 记录就绪后取消下行注释并重新部署，wrangler 会自动完成域名绑定与 TLS。
+# routes = [
+#   { pattern = "dujie_cone.520691.xyz", custom_domain = true }
+# ]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "dujiecode-db"
-database_id = "PENDING_345_D1_ID"
+database_id = "67fd4b8a-464b-4799-ac92-ad060cb91a48"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "PENDING_345_KV_ID"
+id = "1c168f5887d5457b8fa456084c9ca4b1"
 
 [[r2_buckets]]
 binding = "R2"
