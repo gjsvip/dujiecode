@@ -29,6 +29,8 @@ import shellRoutes from './routes/shell'
 import conversationRoutes from './routes/conversations'
 import backendRoutes from './routes/backends'
 import blogRoutes from './routes/blog'
+import adminRoutes from './routes/admin'
+import { runWeeklyBackup } from './lib/backup'
 /* Durable Object 必须从 Worker 入口导出，wrangler 据此识别绑定类（部署集成要求） */
 export { TerminalRoom } from '../do/terminal-room'
 
@@ -99,6 +101,8 @@ const requestIdMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const requestId =
     inbound !== undefined && inbound.trim() !== '' ? inbound.trim().slice(0, 64) : newId('req_')
   requestIdByRequest.set(c.req.raw, requestId)
+  // T04：注入上下文变量，业务日志（turnstile/notify/backup 等 scope）可带 requestId 关联
+  c.set('requestId', requestId)
   c.header('X-Request-Id', requestId)
 
   const startedAt = Date.now()
@@ -115,8 +119,8 @@ const requestIdMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
 const CORS_MAX_AGE_SEC = 86400
 /** 允许的请求方法（与 §5.2 端点表一致） */
 const CORS_ALLOWED_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS'
-/** 允许的请求头（Content-Type + 备用 Authorization + requestId 透传） */
-const CORS_ALLOWED_HEADERS = 'Content-Type, Authorization, X-Request-Id'
+/** 允许的请求头（Content-Type + 备用 Authorization + requestId 透传 + T04 管理令牌） */
+const CORS_ALLOWED_HEADERS = 'Content-Type, Authorization, X-Request-Id, X-Admin-Token'
 
 /**
  * 判断 Origin 是否命中白名单：
@@ -191,6 +195,8 @@ const AUTH_EXEMPTIONS: ReadonlyArray<{ method: string; path: string }> = [
   { method: 'POST', path: '/api/blog/view' },
   { method: 'GET', path: '/api/blog/stats' },
   { method: 'GET', path: '/api/blog/says' },
+  // T04 前端灰度开关唯一数据源（公开，无业务敏感信息）
+  { method: 'GET', path: '/api/blog/config' },
 ]
 
 /** api 限流 KV 计数 TTL（秒）：120s 覆盖前后两个分钟桶，保证窗口滑动 */
@@ -236,6 +242,14 @@ async function checkApiRateLimit(c: Context<AppEnv>, userId: string): Promise<Re
 const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   // 入口只把 /api/* 交给 Hono，此处防御性再判一次；非 API 路径直接放行
   if (!c.req.path.startsWith('/api/') || isAuthExempt(c)) {
+    await next()
+    return
+  }
+
+  // T04 管理 API 自带 X-Admin-Token 鉴权（routes/admin.ts 的 adminAuth），不占用用户会话。
+  // isAuthExempt 是 method+path 精确匹配（管理路径带 :id 动态段，通配不可行），
+  // 故用前缀放行 + 路由级中间件承接，语义等价且不漏放（设计 §2.1）。
+  if (c.req.path.startsWith('/api/blog/admin/')) {
     await next()
     return
   }
@@ -296,6 +310,8 @@ app.route('/api', conversationRoutes)
 app.route('/api', backendRoutes)
 // 博客互动（评论/点赞/浏览量/说说，公开免鉴权，数据存 BLOG_DB）
 app.route('/api/blog', blogRoutes)
+// T04 管理后台（8 个端点，组内 adminAuth 鉴权；index.ts 已对前缀放行 JWT 中间件）
+app.route('/api/blog/admin', adminRoutes)
 
 // 地域与镜像信息（§12-D2）：免鉴权。落地页据此展示「国内/海外推荐入口」提示，
 // 静态镜像（GitHub Pages 等） fetch 失败时静默降级为静态镜像列表。
@@ -373,6 +389,18 @@ const worker: ExportedHandler<Env> = {
       // 资源绑定异常（如不受支持的请求方法打到资源路由）归一化为 JSON 404
       return jsonError('NOT_FOUND', '资源不存在', 404)
     }
+  },
+  // T05 定时备份（wrangler.toml [triggers] crons = ["0 2 * * 1"]，周一 02:00 UTC）：
+  // waitUntil 保证 backup 在 isolate 回收前执行完；异常由 backup 调用链上抛至此，
+  // 记 console.error 后本周失败不重试，下周一自然重跑（设计 §5）。
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      runWeeklyBackup(env).catch((err) => {
+        console.error(
+          JSON.stringify({ level: 'error', scope: 'backup', msg: '周备份失败', error: String(err) }),
+        )
+      }),
+    )
   },
 }
 

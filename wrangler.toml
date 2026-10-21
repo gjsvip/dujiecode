@@ -44,11 +44,22 @@ class_name = "TerminalRoom"
 tag = "v1"
 new_sqlite_classes = ["TerminalRoom"]
 
+# T05 定时备份：周一 02:00 UTC（北京时间周一 10:00）导出 comments+says 全量到 R2
+[triggers]
+crons = ["0 2 * * 1"]
+
 [vars]
 ENVIRONMENT = "production"
 APP_ORIGIN = "https://dujiecone.520691.xyz"
 MAX_AGENT_ROUNDS = "25"
 SSE_KEEPALIVE_SEC = "15"
+
+# T04 Turnstile 站点密钥（公开值，可入 git；可被 KV cfg:turnstile_site_key 覆盖实现免部署轮换）
+TURNSTILE_SITE_KEY = ""
+# T04 回复通知邮件发件人（需在 Resend 后台验证 520691.xyz 域名 DNS 后才能发信，见 runbook）
+MAIL_FROM = "渡劫code <noreply@520691.xyz>"
+# T04 通知邮件博文链接前缀（博客实际域名为 www.520691.xyz，文内链接 {base}{slug}）
+BLOG_POST_URL_BASE = "https://www.520691.xyz/posts/"
 
 # 国内镜像地址（§12-D2）：落地页「访问入口」向国内访客提示用；
 # 不做服务端跳转（访问本 Worker 不跳转）。可切换为 Gitee Pages：

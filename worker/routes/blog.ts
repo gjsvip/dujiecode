@@ -5,16 +5,29 @@
  * 数据存于独立 D1 库（BLOG_DB），三端静态站（CF Pages / GitHub Pages / Gitee Pages）
  * 共用同一 API，实现「国内发的评论国际站可见」的全球数据同步。
  *
+ * T04 增强（ARCH-T04-COMMENT-ADMIN-2026-10-21）：
+ * - POST /comments 链路加 Turnstile 人机校验 → 黑名单 → 审核状态 → 回复通知；
+ * - 新增 GET /config（前端灰度开关唯一数据源，fresh 读 KV）；
+ * - 访客指纹/IP 黑名单哈希统一切换 lib/visitor.ts（指纹双轨，行为不变）；
+ * - 博主可带 X-Admin-Token 从公开表单回复：免 Turnstile、直接 approved（D5）。
+ *
  * 安全策略：
- * - 访客指纹 = sha256(CF-Connecting-IP + UA + 盐)，不存明文 IP；
+ * - 访客指纹 = sha256(IP + UA + 盐)，不存明文 IP；IP 黑名单哈希 = sha256(IP + ipban + 盐)
+ *   （双轨盐前缀不同，见 lib/visitor.ts，不可互相替代）；
  * - 发评论限流 2 条 / 分钟 / 指纹（KV 计数桶）；
  * - 字段长度与格式强校验，email 仅用于 Gravatar 头像（md5）不返回前端；
+ *   回复通知明文邮箱单独存 comment_emails（隐私契约，D4）；
  * - 回复必须指向同文章已审核评论，防跨文章注入。
  */
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { AppEnv } from '../types'
+import { ADMIN_TOKEN_HEADER, verifyAdminToken } from '../middleware/admin-auth'
+import { getBlogConfig } from '../lib/config'
+import { blogSalt, ipBanHash, requestIp, visitorHash } from '../lib/visitor'
+import { verifyTurnstile } from '../lib/turnstile'
+import { notifyParentOfReply } from '../lib/notify'
 
 const blogRoutes = new Hono<AppEnv>()
 
@@ -28,6 +41,8 @@ const MAX_WEBSITE = 200
 const MAX_SLUG = 100
 const COMMENT_RATE_LIMIT = 2
 const COMMENT_RATE_TTL_SEC = 70
+/** Turnstile token 长度上限（设计 §2.2：≤2048；超长按缺失处理） */
+const MAX_TURNSTILE_TOKEN = 2048
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const URL_RE = /^https?:\/\/[^\s]+$/
@@ -59,18 +74,22 @@ function fail(c: Context<AppEnv>, code: string, message: string, status: Content
 }
 
 /* ------------------------------------------------------------------ */
-/* 访客指纹与 MD5                                                        */
+/* GET /api/blog/config — 前端灰度开关唯一数据源（T04 新增，公开）        */
 /* ------------------------------------------------------------------ */
 
-/** 访客指纹：IP + UA + 固定盐，sha256 hex（不存明文，限流与点赞去重共用） */
-async function visitorHash(c: Context<AppEnv>): Promise<string> {
-  const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '0.0.0.0'
-  const ua = c.req.header('User-Agent') ?? ''
-  const salt = (c.env as unknown as { BLOG_SALT?: string }).BLOG_SALT ?? 'gjsvip-blog'
-  const data = new TextEncoder().encode(`${ip}|${ua}|${salt}`)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+blogRoutes.get('/config', async (c) => {
+  // fresh 读：绕过 60s 内存缓存，管理页/调试可见即时开关值
+  const cfg = await getBlogConfig(c.env, { fresh: true })
+  c.header('Cache-Control', 'public, max-age=60')
+  return c.json({
+    code: 0,
+    data: {
+      turnstile: { enabled: cfg.turnstileEnabled, siteKey: cfg.turnstileSiteKey, failOpen: cfg.turnstileFailOpen },
+      moderation: { enabled: cfg.moderationEnabled },
+      notify: { enabled: cfg.notifyEnabled },
+    },
+  })
+})
 
 /**
  * MD5（公有领域标准实现，Gravatar 头像需要）。
@@ -279,7 +298,7 @@ blogRoutes.get('/comments', async (c) => {
 })
 
 /* ------------------------------------------------------------------ */
-/* POST /api/blog/comments — 发表评论 / 回复                              */
+/* POST /api/blog/comments — 发表评论 / 回复（T04 链路重写，顺序即防线顺序） */
 /* ------------------------------------------------------------------ */
 
 blogRoutes.post('/comments', async (c) => {
@@ -290,6 +309,7 @@ blogRoutes.post('/comments', async (c) => {
     return fail(c, 'BAD_JSON', '请求体不是合法 JSON')
   }
 
+  // ① 字段强校验（既有逻辑不变）
   const slug = typeof body.slug === 'string' ? body.slug.trim() : ''
   const nickname = typeof body.nickname === 'string' ? body.nickname.trim() : ''
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
@@ -297,6 +317,11 @@ blogRoutes.post('/comments', async (c) => {
   const content = typeof body.content === 'string' ? body.content.trim() : ''
   const parentId =
     typeof body.parentId === 'number' && Number.isFinite(body.parentId) ? Math.floor(body.parentId) : null
+  // Turnstile token：≤2048 的字符串；缺失/类型不符/超长均按缺失处理
+  // （开启校验时由 verifyTurnstile 返回 400 TURNSTILE_TOKEN_MISSING）
+  const turnstileTokenRaw = typeof body.turnstileToken === 'string' ? body.turnstileToken.trim() : ''
+  const turnstileToken =
+    turnstileTokenRaw.length > 0 && turnstileTokenRaw.length <= MAX_TURNSTILE_TOKEN ? turnstileTokenRaw : null
 
   if (slug === '' || slug.length > MAX_SLUG) return fail(c, 'BAD_SLUG', '文章标识不合法')
   if (nickname === '' || nickname.length > MAX_NICKNAME) return fail(c, 'BAD_NICKNAME', `昵称需 1-${MAX_NICKNAME} 字`)
@@ -309,8 +334,14 @@ blogRoutes.post('/comments', async (c) => {
     return fail(c, 'BAD_CONTENT', `评论内容需 1-${MAX_CONTENT} 字`)
   }
 
-  // 频率限制：同指纹每分钟最多 COMMENT_RATE_LIMIT 条
-  const hash = await visitorHash(c)
+  // ② 博主身份（决策 D5）：公开表单带有效 X-Admin-Token → 免 Turnstile、直接 approved；
+  //    无头/无效值按匿名忽略，不报错、不泄露
+  const adminTokenValid = await verifyAdminToken(c.env, c.req.header(ADMIN_TOKEN_HEADER))
+
+  const ip = requestIp(c.req.raw)
+
+  // ③ 频率限制：同指纹每分钟最多 COMMENT_RATE_LIMIT 条（读计数，写在 ⑧）
+  const hash = await visitorHash(ip, c.req.header('User-Agent') ?? '', blogSalt(c.env))
   const bucket = Math.floor(Date.now() / 60000)
   const rlKey = `blog:rl:${hash}:${bucket}`
   const used = Number.parseInt((await c.env.KV.get(rlKey)) ?? '0', 10)
@@ -318,7 +349,28 @@ blogRoutes.post('/comments', async (c) => {
     return fail(c, 'RATE_LIMITED', '评论太频繁了，休息一分钟再来吧', 429)
   }
 
-  // 回复必须指向同文章已审核评论
+  // ④ Turnstile 人机校验（博主身份或开关关闭时跳过；三分支降级见 lib/turnstile.ts）
+  if (!adminTokenValid) {
+    const outcome = await verifyTurnstile(c.env, turnstileToken, ip)
+    if (!outcome.ok) {
+      return fail(c, outcome.code, outcome.message, outcome.status)
+    }
+  }
+
+  // ⑤ 黑名单：邮箱非空查 email_md5，恒查 ip_hash（双轨盐前缀不同，见 lib/visitor.ts）。
+  //    空邮箱用户的派生 md5 随「昵称:文章」变化，拉黑无意义，刻意只传 null 跳过 email 维度
+  const emailMd5 = md5(email || `${nickname}:${slug}`) // 空邮箱兜底：派生稳定头像哈希
+  const ipBan = await ipBanHash(ip, blogSalt(c.env))
+  const banned = await c.env.BLOG_DB.prepare(
+    `SELECT ban_type FROM banned
+     WHERE (ban_type = 'email_md5' AND ban_value = ?1) OR (ban_type = 'ip_hash' AND ban_value = ?2)
+     LIMIT 1`,
+  )
+    .bind(email !== '' ? emailMd5 : null, ipBan)
+    .first<{ ban_type: string }>()
+  if (banned !== null) return fail(c, 'BANNED', '评论被拒绝，如有疑问请联系博主', 403)
+
+  // ⑥ 回复必须指向同文章已审核评论（既有）
   if (parentId !== null) {
     const parent = await c.env.BLOG_DB.prepare(
       'SELECT id FROM comments WHERE id = ?1 AND slug = ?2 AND status = ?3',
@@ -328,17 +380,45 @@ blogRoutes.post('/comments', async (c) => {
     if (parent === null) return fail(c, 'BAD_PARENT', '回复的评论不存在或未审核')
   }
 
-  await c.env.KV.put(rlKey, String(used + 1), { expirationTtl: COMMENT_RATE_TTL_SEC })
-  // 空邮箱兜底：用「昵称:文章」派生稳定头像哈希，保证空邮箱用户也有 identicon 且不报错
-  const emailMd5 = md5(email || `${nickname}:${slug}`)
-  const result = await c.env.BLOG_DB.prepare(
-    `INSERT INTO comments (slug, parent_id, nickname, email_md5, website, content, status)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'approved')`,
-  )
-    .bind(slug, parentId, nickname, emailMd5, website, content)
-    .run()
+  // ⑦ 审核状态（决策 D3/D5）：博主提交或审核队列关闭 → approved；否则 pending
+  const cfg = await getBlogConfig(c.env)
+  const status = adminTokenValid || !cfg.moderationEnabled ? 'approved' : 'pending'
 
-  return c.json({ code: 0, data: { id: Number(result.meta.last_row_id) } }, 201)
+  // ⑧ 限流计数 +1（读在 ③、写在此，位置不变）
+  await c.env.KV.put(rlKey, String(used + 1), { expirationTtl: COMMENT_RATE_TTL_SEC })
+
+  // ⑨ 插入评论（ip_hash 供 IP 维度拉黑与管理列表溯源）
+  const result = await c.env.BLOG_DB.prepare(
+    `INSERT INTO comments (slug, parent_id, nickname, email_md5, website, content, status, ip_hash)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+  )
+    .bind(slug, parentId, nickname, emailMd5, website, content, status, ipBan)
+    .run()
+  const id = Number(result.meta.last_row_id)
+
+  // ⑩ 回复通知邮箱单独存放（隐私契约：comments 只存 md5；明文邮箱只进 comment_emails，D4）
+  if (email !== '') {
+    await c.env.BLOG_DB.prepare('INSERT OR REPLACE INTO comment_emails(comment_id, email) VALUES (?1, ?2)')
+      .bind(id, email)
+      .run()
+  }
+
+  // ⑪ 已审核的回复 → 异步通知被回复者（waitUntil 异步，绝不阻塞响应）
+  if (parentId !== null && status === 'approved') {
+    c.executionCtx.waitUntil(
+      notifyParentOfReply(c.env, {
+        parentId,
+        replyId: id,
+        replyEmailMd5: emailMd5,
+        replyNickname: nickname,
+        replyContent: content,
+        slug,
+      }),
+    )
+  }
+
+  // ⑫ 201（新增 status 字段：pending 时前端提示「已提交，待审核后展示」；旧前端读 id 不受影响）
+  return c.json({ code: 0, data: { id, status } }, 201)
 })
 
 /* ------------------------------------------------------------------ */
@@ -376,7 +456,8 @@ blogRoutes.post('/like', async (c) => {
     if (exists === null) return fail(c, 'BAD_TARGET', '评论不存在')
   }
 
-  const hash = await visitorHash(c)
+  // 指纹计算切库 lib/visitor.ts（与迁移前行为一致：sha256(IP|UA|salt)）
+  const hash = await visitorHash(requestIp(c.req.raw), c.req.header('User-Agent') ?? '', blogSalt(c.env))
   const existing = await c.env.BLOG_DB.prepare(
     'SELECT id FROM likes WHERE target_type = ?1 AND target_id = ?2 AND voter_hash = ?3',
   )
