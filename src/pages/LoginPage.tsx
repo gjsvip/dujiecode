@@ -356,12 +356,18 @@ export default function LoginPage(): ReactNode {
             </button>
           </p>
 
-          {/* 安全说明（小屏补充展示静态加密告知） */}
-          <p className="mt-6 flex items-start gap-2 rounded-lg border border-border bg-bg px-3 py-2.5 text-[11px] leading-relaxed text-dim lg:hidden">
-            <LockIcon className="mt-px shrink-0 text-accent" />
-            静态加密：API Key 与 agent token 以 AES-256-GCM 信封加密存储；密码经 PBKDF2 10
-            万次迭代哈希；会话存于 HttpOnly Cookie。
-          </p>
+          {/* 安全说明（小屏：折叠为「安全特性 ▾」details，避免常驻大段文字撑破布局） */}
+          <details className="security-details mt-6 rounded-lg border border-border bg-bg px-3 py-2.5 text-[11px] leading-relaxed text-dim lg:hidden">
+            <summary className="flex items-center gap-2 font-medium text-text">
+              <LockIcon className="shrink-0 text-accent" />
+              安全特性
+              <span className="details-arrow ml-auto shrink-0 text-dim transition-transform">▾</span>
+            </summary>
+            <p className="mt-2">
+              静态加密：API Key 与 agent token 以 AES-256-GCM 信封加密存储；密码经 PBKDF2 10
+              万次迭代哈希；会话存于 HttpOnly Cookie。
+            </p>
+          </details>
 
           <div className="mt-6 text-center">
             <Link to="/" className="text-[11px] text-dim transition-colors hover:text-text">

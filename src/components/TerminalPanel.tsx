@@ -269,6 +269,25 @@ export default function TerminalPanel({ workspaceId }: { workspaceId: string }):
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  /**
+   * 面板高度：手机端按视口比例收缩（默认 300px 会吃掉大半屏），
+   * 桌面端保持 PANEL_HEIGHT；同时跟随视口旋转/缩放重算。
+   */
+  const [panelHeight, setPanelHeight] = useState<number>(PANEL_HEIGHT)
+  useEffect(() => {
+    const compute = (): void => {
+      const width = globalThis.innerWidth
+      setPanelHeight(
+        width <= 640
+          ? Math.max(180, Math.min(240, Math.round(globalThis.innerHeight * 0.34)))
+          : PANEL_HEIGHT,
+      )
+    }
+    compute()
+    globalThis.addEventListener('resize', compute)
+    return () => globalThis.removeEventListener('resize', compute)
+  }, [])
+
   useEffect(() => {
     void loadBackends()
   }, [loadBackends])
@@ -291,10 +310,10 @@ export default function TerminalPanel({ workspaceId }: { workspaceId: string }):
   return (
     <section
       className="shrink-0 border-t border-border bg-panel/50"
-      style={{ height: collapsed ? 36 : PANEL_HEIGHT }}
+      style={{ height: collapsed ? 36 : panelHeight }}
     >
       {/* Tab 栏 */}
-      <div className="flex h-9 items-center gap-1 border-b border-border px-2">
+      <div className="flex h-9 items-center gap-1 border-b border-border px-2 max-sm:h-11">
         <button
           type="button"
           className="btn btn-ghost btn-sm shrink-0 px-1.5"
@@ -409,7 +428,7 @@ export default function TerminalPanel({ workspaceId }: { workspaceId: string }):
 
       {/* 终端主体（全部会话保持挂载，仅切换显隐以保留滚动缓冲） */}
       {!collapsed && (
-        <div className="relative" style={{ height: PANEL_HEIGHT - 36 }}>
+        <div className="relative" style={{ height: panelHeight - 36 }}>
           {sessions.length === 0 && (
             <div className="flex h-full items-center justify-center text-xs text-dim">
               点击「＋」打开虚拟 Shell 或远程后端终端

@@ -321,7 +321,7 @@ function ProvidersTab(): ReactNode {
 
       {/* 供应商表单 */}
       {form !== null && (
-        <form className="card p-5" onSubmit={(event) => void onSave(event)}>
+        <form className="card p-4 sm:p-5" onSubmit={(event) => void onSave(event)}>
           <h3 className="text-sm font-semibold">
             {form.id === null ? '添加供应商' : `编辑「${form.name}」`}
           </h3>
@@ -614,7 +614,7 @@ function BackendsTab(): ReactNode {
       )}
 
       {/* 创建表单 */}
-      <form className="card p-5" onSubmit={(event) => void onCreate(event)}>
+      <form className="card p-4 sm:p-5" onSubmit={(event) => void onCreate(event)}>
         <h3 className="text-sm font-semibold">添加执行后端</h3>
         <p className="mt-1 text-xs text-dim">
           在你自己的 Linux 服务器上运行 dujie-agent.py 主动外连，无需暴露端口。
@@ -799,7 +799,7 @@ function GeneralTab(): ReactNode {
   return (
     <div className="mt-5 space-y-5">
       {/* 账户信息 */}
-      <section className="card p-5">
+      <section className="card p-4 sm:p-5">
         <h2 className="text-sm font-semibold">账户</h2>
         <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-3">
           <div>
@@ -820,7 +820,7 @@ function GeneralTab(): ReactNode {
       </section>
 
       {/* 静态加密安全说明 */}
-      <section className="card p-5">
+      <section className="card p-4 sm:p-5">
         <h2 className="text-sm font-semibold">安全说明</h2>
         <ul className="mt-3 space-y-2 text-xs leading-relaxed text-dim">
           <li>
@@ -843,7 +843,7 @@ function GeneralTab(): ReactNode {
       </section>
 
       {/* 审计日志 */}
-      <section className="card p-5">
+      <section className="card p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">审计日志</h2>
           <span className="chip">共 {total} 条</span>
@@ -925,17 +925,17 @@ export default function SettingsPage({ initialTab = 'general' }: { initialTab?: 
 
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-5 sm:py-8">
         <h1 className="text-xl font-semibold tracking-wide">设置</h1>
 
-        {/* Tab 切换 */}
-        <div className="mt-4 flex gap-1 border-b border-border">
+        {/* Tab 切换（窄屏横向滚动 + 44px 触控区） */}
+        <div className="mt-4 flex gap-1 overflow-x-auto border-b border-border">
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
               className={cx(
-                '-mb-px border-b-2 px-4 py-2 text-sm transition-colors',
+                '-mb-px shrink-0 border-b-2 px-4 py-2 text-sm transition-colors max-sm:min-h-[44px] max-sm:px-3',
                 tab === item.id
                   ? 'border-accent text-accent'
                   : 'border-transparent text-dim hover:text-text',

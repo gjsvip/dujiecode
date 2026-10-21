@@ -323,8 +323,10 @@ function AppCta({
 /* 页面片段                                                             */
 /* ------------------------------------------------------------------ */
 
-/** 顶部导航（sticky + 毛玻璃） */
+/** 顶部导航（sticky + 毛玻璃；≤768px 折叠为下拉菜单） */
 function SiteHeader(): ReactNode {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-bg/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -332,6 +334,8 @@ function SiteHeader(): ReactNode {
           <LogoMark className="h-8 w-8" />
           <span className="text-[15px] font-semibold tracking-wide">渡劫code</span>
         </Link>
+
+        {/* 桌面导航 */}
         <nav className="hidden items-center gap-6 md:flex" aria-label="页面导航">
           {NAV_LINKS.map((link) => (
             <a
@@ -343,8 +347,51 @@ function SiteHeader(): ReactNode {
             </a>
           ))}
         </nav>
-        <AppCta className="btn btn-primary btn-sm">进入工作台</AppCta>
+
+        <div className="flex items-center gap-1.5">
+          <AppCta className="btn btn-primary btn-sm">进入工作台</AppCta>
+
+          {/* 移动端汉堡（≤768px） */}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm touch-target md:hidden"
+            aria-label="展开导航菜单"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              strokeLinecap="round"
+              className="h-5 w-5"
+              aria-hidden="true"
+            >
+              {menuOpen ? <path d="M6 6l12 12 M18 6L6 18" /> : <path d="M4 6.5h16 M4 12h16 M4 17.5h16" />}
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* 移动端下拉菜单 */}
+      {menuOpen && (
+        <nav
+          className="border-t border-border bg-panel/95 px-4 py-2 backdrop-blur-md md:hidden"
+          aria-label="页面导航（移动端）"
+        >
+          {NAV_LINKS.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="flex min-h-[44px] items-center border-b border-border/60 text-sm text-dim transition-colors last:border-b-0 hover:text-text"
+              onClick={() => setMenuOpen(false)}
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
+      )}
     </header>
   )
 }

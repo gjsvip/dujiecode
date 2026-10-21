@@ -69,6 +69,36 @@ const ChatIcon = ({ className }: { className?: string }): ReactNode => (
   />
 )
 
+/**
+ * 视口宽度媒体查询 Hook：返回查询是否命中，并在视口变化时同步。
+ * 用于工作区在窄屏（≤900px）切换为单栏 Tab 布局。
+ */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState<boolean>(() => {
+    if (typeof globalThis.matchMedia !== 'function') {
+      return false
+    }
+    return globalThis.matchMedia(query).matches
+  })
+
+  useEffect(() => {
+    if (typeof globalThis.matchMedia !== 'function') {
+      return undefined
+    }
+    const mql = globalThis.matchMedia(query)
+    const onChange = (event: MediaQueryListEvent): void => setMatches(event.matches)
+    // 初始值以挂载时的实时结果为准（避免 SSR/首帧不一致）
+    setMatches(mql.matches)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [query])
+
+  return matches
+}
+
+/** 窄屏单栏 Tab 的面板标识 */
+type MobilePane = 'files' | 'editor' | 'chat'
+
 /** 加载骨架 */
 function PageLoading(): ReactNode {
   return (
@@ -101,6 +131,87 @@ function PageError({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 /* ------------------------------------------------------------------ */
+/* 侧栏：文件树 + 会话列表（宽屏三栏与窄屏「文件」Tab 共用）              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 左侧栏（文件树 + 会话列表）。
+ * compact=true 时占满单栏宽度（窄屏 Tab 布局）；否则为定宽侧栏。
+ */
+function SidePane({
+  workspaceId,
+  compact,
+}: {
+  workspaceId: string
+  compact: boolean
+}): ReactNode {
+  const conversations = useChatStore((s) => s.conversations)
+  const activeConversationId = useChatStore((s) => s.activeConversationId)
+  const selectConversation = useChatStore((s) => s.selectConversation)
+
+  return (
+    <aside
+      className={cx(
+        'flex min-h-0 shrink-0 flex-col bg-panel/40',
+        compact ? 'h-full w-full border-r-0' : 'w-60 border-r border-border xl:w-64',
+      )}
+    >
+      <div className="flex h-8 shrink-0 items-center border-b border-border px-3">
+        <span className="text-[11px] font-medium text-dim">文件</span>
+      </div>
+      <div
+        className={cx(
+          'min-h-0 shrink-0 overflow-hidden border-b border-border',
+          compact ? 'h-[42%]' : 'h-[45%]',
+        )}
+      >
+        <FileTree workspaceId={workspaceId} />
+      </div>
+
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3">
+        <span className="text-[11px] font-medium text-dim">会话</span>
+        <button
+          type="button"
+          className="text-[11px] text-dim transition-colors hover:text-accent"
+          onClick={() => void selectConversation(null)}
+        >
+          ＋ 新会话
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        {conversations.map((conversation) => (
+          <button
+            key={conversation.id}
+            type="button"
+            className={cx(
+              'flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors',
+              // 触控区底线：窄屏会话项放大到 44px，防误触
+              compact && 'min-h-[44px]',
+              conversation.id === activeConversationId
+                ? 'bg-accent/10 text-accent'
+                : 'text-dim hover:bg-elev/50 hover:text-text',
+            )}
+            onClick={() => {
+              void selectConversation(conversation.id)
+            }}
+          >
+            <ChatIcon className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {conversation.title || '未命名会话'}
+            </span>
+          </button>
+        ))}
+        {conversations.length === 0 && (
+          <p className="px-3 py-4 text-[11px] leading-relaxed text-dim">
+            暂无会话，{compact ? '切到「对话」Tab' : '在右侧'}开始第一次对话
+          </p>
+        )}
+      </div>
+    </aside>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* 主组件                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -119,13 +230,14 @@ export default function WorkspacePage(): ReactNode {
 
   // chat store（会话列表）
   const loadConversations = useChatStore((s) => s.loadConversations)
-  const conversations = useChatStore((s) => s.conversations)
-  const activeConversationId = useChatStore((s) => s.activeConversationId)
-  const selectConversation = useChatStore((s) => s.selectConversation)
 
   // terminal store（后端列表）
   const loadBackends = useTerminalStore((s) => s.loadBackends)
   const backends = useTerminalStore((s) => s.backends)
+
+  /** ≤900px 走单栏 Tab 布局（文件 / 编辑 / 对话），避免三栏挤压到不可用 */
+  const compact = useMediaQuery('(max-width: 900px)')
+  const [mobilePane, setMobilePane] = useState<MobilePane>('editor')
 
   // 执行后端切换（持久化，与 Layout 共用）
   const [backend, setBackend] = useState<string>(() => readPersistedBackend())
@@ -170,15 +282,16 @@ export default function WorkspacePage(): ReactNode {
   return (
     <div className="flex h-full flex-col">
       {/* 顶栏：工作区名 / 执行后端切换 / 审批铃铛 / 设置入口 */}
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-panel/60 px-3">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-panel/60 px-2 sm:px-3">
         <button
           type="button"
-          className="btn btn-ghost btn-sm shrink-0"
+          className="btn btn-ghost btn-sm shrink-0 max-sm:min-h-[44px] max-sm:px-2"
           onClick={() => navigate('/dashboard')}
         >
-          ← 工作台
+          <span className="hidden sm:inline">← 工作台</span>
+          <span className="sm:hidden">←</span>
         </button>
-        <span className="min-w-0 truncate text-sm font-semibold text-text">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text sm:flex-none">
           {current?.name ?? ''}
         </span>
         <span className="chip hidden shrink-0 sm:inline-flex">
@@ -188,7 +301,7 @@ export default function WorkspacePage(): ReactNode {
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {/* 执行后端切换（新终端默认后端） */}
           <select
-            className="field h-7 w-36 px-1.5 text-[11px] sm:w-44"
+            className="field h-7 w-28 px-1.5 text-[11px] sm:w-36 lg:w-44"
             value={backend}
             title="执行后端（新终端默认）"
             onChange={(event) => setBackend(event.target.value)}
@@ -232,64 +345,64 @@ export default function WorkspacePage(): ReactNode {
         </div>
       </header>
 
-      {/* 三区布局 */}
-      <div className="flex min-h-0 flex-1">
-        {/* 左侧：文件树 + 会话列表 */}
-        <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-panel/40 xl:w-64">
-          <div className="flex h-8 shrink-0 items-center border-b border-border px-3">
-            <span className="text-[11px] font-medium text-dim">文件</span>
-          </div>
-          <div className="h-[45%] min-h-0 shrink-0 overflow-hidden border-b border-border">
-            <FileTree workspaceId={workspaceId} />
-          </div>
-
-          <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3">
-            <span className="text-[11px] font-medium text-dim">会话</span>
-            <button
-              type="button"
-              className="text-[11px] text-dim transition-colors hover:text-accent"
-              onClick={() => void selectConversation(null)}
-            >
-              ＋ 新会话
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto">
-            {conversations.map((conversation) => (
+      {/* 三区布局：≥900px 三栏并排；≤900px 单栏 Tab 切换（文件 / 编辑 / 对话） */}
+      {compact ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div
+            className="flex shrink-0 border-b border-border bg-panel/60"
+            role="tablist"
+            aria-label="工作区面板切换"
+          >
+            {(
+              [
+                { key: 'files', label: '文件' },
+                { key: 'editor', label: '编辑' },
+                { key: 'chat', label: '对话' },
+              ] as { key: MobilePane; label: string }[]
+            ).map((tab) => (
               <button
-                key={conversation.id}
+                key={tab.key}
                 type="button"
-                className={cx(
-                  'flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors',
-                  conversation.id === activeConversationId
-                    ? 'bg-accent/10 text-accent'
-                    : 'text-dim hover:bg-elev/50 hover:text-text',
-                )}
-                onClick={() => void selectConversation(conversation.id)}
+                role="tab"
+                aria-selected={mobilePane === tab.key}
+                className={cx('pane-tab', mobilePane === tab.key && 'active')}
+                onClick={() => setMobilePane(tab.key)}
               >
-                <ChatIcon className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">
-                  {conversation.title || '未命名会话'}
-                </span>
+                {tab.label}
               </button>
             ))}
-            {conversations.length === 0 && (
-              <p className="px-3 py-4 text-[11px] leading-relaxed text-dim">
-                暂无会话，在右侧开始第一次对话
-              </p>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {mobilePane === 'files' && <SidePane workspaceId={workspaceId} compact />}
+            {mobilePane === 'editor' && (
+              <main className="h-full min-w-0">
+                <EditorPane />
+              </main>
+            )}
+            {mobilePane === 'chat' && (
+              <aside className="flex h-full w-full flex-col bg-panel/30">
+                <ChatPanel workspaceId={workspaceId} />
+              </aside>
             )}
           </div>
-        </aside>
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          {/* 左侧：文件树 + 会话列表 */}
+          <SidePane workspaceId={workspaceId} compact={false} />
 
-        {/* 中央：Monaco 编辑区 */}
-        <main className="min-w-0 flex-1">
-          <EditorPane />
-        </main>
+          {/* 中央：Monaco 编辑区 */}
+          <main className="min-w-0 flex-1">
+            <EditorPane />
+          </main>
 
-        {/* 右侧：AI 对话面板 */}
-        <aside className="flex w-[21rem] shrink-0 flex-col border-l border-border bg-panel/30 2xl:w-[24rem]">
-          <ChatPanel workspaceId={workspaceId} />
-        </aside>
-      </div>
+          {/* 右侧：AI 对话面板 */}
+          <aside className="flex w-[21rem] shrink-0 flex-col border-l border-border bg-panel/30 2xl:w-[24rem]">
+            <ChatPanel workspaceId={workspaceId} />
+          </aside>
+        </div>
+      )}
 
       {/* 底部：终端面板 */}
       <TerminalPanel workspaceId={workspaceId} />

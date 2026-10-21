@@ -5,7 +5,7 @@
  * 守卫内的页面（/dashboard、/w/:id、/settings/*）共用本外壳。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useWorkspaceStore } from '../store/workspace'
@@ -75,6 +75,12 @@ const GearIcon = ({ className }: { className?: string }): ReactNode => (
 const ChevronDownIcon = ({ className }: { className?: string }): ReactNode => (
   <Icon path="M6 9.5l6 6 6-6" className={className} />
 )
+const MenuIcon = ({ className }: { className?: string }): ReactNode => (
+  <Icon path="M4 6.5h16 M4 12h16 M4 17.5h16" className={className} />
+)
+const CloseIcon = ({ className }: { className?: string }): ReactNode => (
+  <Icon path="M6 6l12 12 M18 6L6 18" className={className} />
+)
 const CheckIcon = ({ className }: { className?: string }): ReactNode => (
   <Icon path="M5 12.5l4.5 4.5L19 7.5" className={className} />
 )
@@ -107,6 +113,7 @@ function useClickOutside(onOutside: () => void): RefObject<HTMLDivElement> {
 /** 应用外壳（§6.2） */
 export default function Layout(): ReactNode {
   const navigate = useNavigate()
+  const location = useLocation()
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   // 审批铃铛计数与当前工作区来自 workspace store（§6.3）
@@ -123,6 +130,8 @@ export default function Layout(): ReactNode {
   })
   const [backendMenuOpen, setBackendMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  /** 移动端汉堡抽屉（≤768px 主导航入口） */
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // 拉取执行后端列表（展示在线状态；失败时仅保留内置虚拟 Shell）
   useEffect(() => {
@@ -151,6 +160,30 @@ export default function Layout(): ReactNode {
     }
   }, [currentBackend])
 
+  // 路由变化时自动收起抽屉（避免抽屉残留遮挡内容）
+  useEffect(() => {
+    setDrawerOpen(false)
+  }, [location.pathname])
+
+  // 抽屉展开时锁定 body 滚动，并按 ESC 关闭
+  useEffect(() => {
+    if (!drawerOpen) {
+      return undefined
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setDrawerOpen(false)
+      }
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    globalThis.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      globalThis.removeEventListener('keydown', onKeyDown)
+    }
+  }, [drawerOpen])
+
   const closeBackendMenu = useCallback(() => setBackendMenuOpen(false), [])
   const closeUserMenu = useCallback(() => setUserMenuOpen(false), [])
   const backendRef = useClickOutside(closeBackendMenu)
@@ -159,6 +192,7 @@ export default function Layout(): ReactNode {
   /** 登出：清空会话后回登录页 */
   const onLogout = useCallback(async () => {
     setUserMenuOpen(false)
+    setDrawerOpen(false)
     await logout()
     navigate('/login', { replace: true })
   }, [logout, navigate])
@@ -176,6 +210,14 @@ export default function Layout(): ReactNode {
   const currentLabel = current.id === 'vfs' ? '虚拟 Shell' : current.name
   const initial = (user?.displayName || user?.email || '?').trim().charAt(0).toUpperCase()
 
+  /** 抽屉导航项（移动端主导航；active 按当前路径高亮） */
+  const drawerLinks: { to: string; label: string }[] = [
+    { to: '/dashboard', label: '工作台' },
+    { to: '/settings/general', label: '设置 · 通用' },
+    { to: '/settings/providers', label: '设置 · 供应商' },
+    { to: '/settings/backends', label: '设置 · 执行后端' },
+  ]
+
   return (
     <div className="flex h-screen flex-col bg-bg">
       {/* 顶栏 */}
@@ -184,6 +226,21 @@ export default function Layout(): ReactNode {
           <LogoMark className="h-7 w-7" />
           <span className="text-[15px] font-semibold tracking-wide">渡劫code</span>
         </Link>
+
+        {/* 移动端汉堡按钮（≤768px 显示，展开主导航抽屉） */}
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm touch-target md:hidden"
+          aria-label="打开导航菜单"
+          aria-expanded={drawerOpen}
+          onClick={() => {
+            setDrawerOpen(true)
+            setBackendMenuOpen(false)
+            setUserMenuOpen(false)
+          }}
+        >
+          <MenuIcon className="h-5 w-5" />
+        </button>
 
         <div className="ml-auto flex items-center gap-0.5 sm:gap-1">
           {/* 后端切换下拉 */}
@@ -334,6 +391,58 @@ export default function Layout(): ReactNode {
           </div>
         </div>
       </header>
+
+      {/* 移动端导航抽屉（≤768px）：半透明遮罩 + 左侧滑出面板 */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            onClick={() => setDrawerOpen(false)}
+            aria-hidden="true"
+          />
+          <nav
+            className="absolute left-0 top-0 flex h-full w-[17rem] max-w-[82vw] flex-col border-r border-border bg-panel shadow-panel"
+            aria-label="主导航"
+          >
+            <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
+              <LogoMark className="h-7 w-7" />
+              <span className="text-[15px] font-semibold tracking-wide">渡劫code</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm touch-target ml-auto"
+                aria-label="关闭导航菜单"
+                onClick={() => setDrawerOpen(false)}
+              >
+                <CloseIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto py-2">
+              {drawerLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={cx('drawer-link', location.pathname.startsWith(link.to) && 'active')}
+                  onClick={() => setDrawerOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+
+            <div className="shrink-0 border-t border-border p-3">
+              <button
+                type="button"
+                className="btn btn-outline touch-target w-full justify-center"
+                onClick={() => void onLogout()}
+              >
+                <LogoutIcon className="h-4 w-4" />
+                退出登录
+              </button>
+            </div>
+          </nav>
+        </div>
+      )}
 
       {/* 内容区：子路由经 Outlet 渲染；工作区页自行管理内部滚动与布局 */}
       <main className="min-h-0 flex-1 overflow-hidden">

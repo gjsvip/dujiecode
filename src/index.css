@@ -28,6 +28,12 @@
   /* ---- 圆角 / 阴影令牌（全站统一） ---- */
   --radius-card: 12px;
   --shadow-panel: 0 12px 32px rgb(0 0 0 / 0.45);
+
+  /* ---- 响应式断点令牌（移动适配）---- */
+  /* tab   = 640–900 平板竖（tab: 前缀 = min-width 900px） */
+  /* tabl  = 900–1200 平板横 / 小桌面（tabl: 前缀 = min-width 1200px） */
+  --breakpoint-tab: 900px;
+  --breakpoint-tabl: 1200px;
 }
 
 @layer base {
@@ -40,6 +46,10 @@
   body {
     @apply bg-bg text-text font-sans antialiased;
     min-height: 100vh;
+    /* 移动端：禁止因绝对定位光晕/宽表格产生的横向溢出 */
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   ::selection {
     @apply bg-accent/40 text-white;
@@ -122,4 +132,127 @@
   .code-block {
     @apply overflow-x-auto rounded-card border border-border bg-bg px-4 py-3 font-mono text-[13px] leading-relaxed text-text;
   }
+}
+
+/* ============================================================
+   移动适配响应式体系（§移动端改造）
+   断点：≥1200 桌面 / 900–1200 平板横 / 640–900 平板竖 / ≤640 手机
+   说明：以下规则置于 @layer 之外（非层叠样式），
+   优先级高于 Tailwind 工具类，用于强制触控与字号底线。
+   ============================================================ */
+
+/* 触控区工具类：显式标注需满足 44px 最小触控区的元素 */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* 手机（≤640px）：输入框 ≥16px 防 iOS 聚焦自动放大 */
+@media (max-width: 640px) {
+  input.field,
+  textarea.field {
+    font-size: 16px;
+  }
+  /* 主按钮触控底线（密集 UI 的 btn-sm 保持紧凑，见下） */
+  .btn:not(.btn-sm) {
+    min-height: 44px;
+  }
+  .btn-sm {
+    min-height: 34px;
+  }
+  /* 终端主体在手机端收窄行高，避免横向滚动 */
+  .xterm {
+    font-size: 11px;
+  }
+}
+
+/* 平板竖（640–900px）：中等密度 */
+@media (min-width: 641px) and (max-width: 900px) {
+  input.field,
+  textarea.field {
+    font-size: 16px;
+  }
+}
+
+/* 平板横 / 小桌面（901–1200px）：放宽输入字号底线，保持紧凑密度 */
+@media (min-width: 901px) and (max-width: 1200px) {
+  input.field,
+  textarea.field {
+    font-size: 14px;
+  }
+  /* 侧栏与对话面板在 1200px 以下收窄，避免挤压编辑区 */
+  .drawer-link {
+    min-height: 44px;
+  }
+}
+
+/* 小屏手机（≤480px）：进一步压缩留白与字号 */
+@media (max-width: 480px) {
+  .pane-tab {
+    font-size: 13px;
+    padding: 0 4px;
+  }
+  .drawer-link {
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .security-details {
+    font-size: 11px;
+  }
+}
+
+/* 工作区手机端 Tab 切换（WorkspacePage ≤900px 单栏布局） */
+.pane-tab {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-dim);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  cursor: pointer;
+  background: none;
+}
+.pane-tab:hover {
+  color: var(--color-text);
+}
+.pane-tab.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+/* 抽屉导航项（Layout 移动端汉堡抽屉） */
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: var(--color-text);
+  transition: background 0.15s;
+}
+.drawer-link:hover {
+  background: var(--color-panel);
+}
+.drawer-link.active {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+/* 登录页「安全特性」折叠摘要（details/summary） */
+.security-details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.security-details > summary::-webkit-details-marker {
+  display: none;
+}
+.security-details[open] > summary .details-arrow {
+  transform: rotate(180deg);
 }
