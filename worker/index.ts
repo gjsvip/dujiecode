@@ -196,13 +196,15 @@ const AUTH_EXEMPTIONS: ReadonlyArray<{ method: string; path: string }> = [
 /** api 限流 KV 计数 TTL（秒）：120s 覆盖前后两个分钟桶，保证窗口滑动 */
 const API_RATE_TTL_SEC = 120
 
-/** 去除末尾斜杠后精确匹配免鉴权表（容忍 `/api/auth/login/` 写法） */
+/** 去除末尾斜杠后精确匹配免鉴权表（容忍 `/api/auth/login/` 写法）；
+ * HEAD 归一为 GET（Hono GET 路由依 HTTP 规范自动兼容 HEAD，豁免判断需同步） */
 function isAuthExempt(c: Context<AppEnv>): boolean {
   if (c.req.method === 'OPTIONS') {
     return true
   }
+  const method = c.req.method === 'HEAD' ? 'GET' : c.req.method
   const path = c.req.path.replace(/\/+$/, '') || '/'
-  return AUTH_EXEMPTIONS.some((rule) => rule.method === c.req.method && rule.path === path)
+  return AUTH_EXEMPTIONS.some((rule) => rule.method === method && rule.path === path)
 }
 
 /**
