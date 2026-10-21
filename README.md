@@ -44,7 +44,7 @@ wrangler secret put JWT_SECRET                  # openssl rand -hex 32
 ```bash
 npm ci
 npm run build      # tsc --noEmit + vite build（dist/ 内含 dujie-agent.py）
-npm run deploy     # wrangler deploy → dujie_cone.520691.xyz（345 账号自定义域名）
+npm run deploy     # wrangler deploy → dujiecone.520691.xyz（345 账号自定义域名）
 npm run pages      # wrangler pages deploy dist --project-name dujiecode → dujiecode.pages.dev
 ```
 
@@ -63,7 +63,7 @@ export CLOUDFLARE_ACCOUNT_ID=xxxx
 
 | 项 | 值 |
 |---|---|
-| 渡劫code 主域（Workers，完整版） | https://dujie_cone.520691.xyz （345 账号自定义域名，不跳转、直接服务） |
+| 渡劫code 主域（Workers，完整版） | https://dujiecone.520691.xyz （345 账号自定义域名，不跳转、直接服务；旧域名 dujie_cone.520691.xyz 保留兼容） |
 | 个人官网 | https://www.520691.xyz （Cloudflare Pages，345 账号） |
 | 博客 | https://blog.520691.xyz （Cloudflare Pages + GitHub Pages 双通道） |
 | 官网（CF Pages） | https://dujiecode.pages.dev |
@@ -90,8 +90,8 @@ export CLOUDFLARE_ACCOUNT_ID=xxxx
 远程执行代理一键安装
 
 ```bash
-curl -fsSL https://dujie_cone.520691.xyz/dujie-agent.py -o dujie-agent.py
-python3 dujie-agent.py --server wss://dujie_cone.520691.xyz --backend-id bk_xxx --token djt_xxx
+curl -fsSL https://dujiecone.520691.xyz/dujie-agent.py -o dujie-agent.py
+python3 dujie-agent.py --server wss://dujiecone.520691.xyz --backend-id bk_xxx --token djt_xxx
 # 开机自启：sudo python3 dujie-agent.py --print-systemd
 ```
 
@@ -116,7 +116,7 @@ python3 dujie-agent.py --server wss://dujie_cone.520691.xyz --backend-id bk_xxx 
 
 | 入口 | 地址 | 说明 |
 |---|---|---|
-| 渡劫code 主域 | https://dujie_cone.520691.xyz | Worker 自定义域名，完整版工作台，**不跳转直达** |
+| 渡劫code 主域 | https://dujiecone.520691.xyz | Worker 自定义域名，完整版工作台，**不跳转直达** |
 | 个人官网 | https://www.520691.xyz | gjsvip 小开发者主页 + 友链导航 |
 | 博客 | https://blog.520691.xyz | 开发手记（CF Pages + GitHub Pages 双通道） |
 | CF Pages 官网 | https://dujiecode.pages.dev | 静态官网镜像 |
@@ -124,7 +124,7 @@ python3 dujie-agent.py --server wss://dujie_cone.520691.xyz --backend-id bk_xxx 
 | Gitee 仓库 | https://gitee.com/dujie_nb_admin/dujiecode | 国内源码托管 + Pages（实名后启用） |
 | GitHub 仓库 | https://github.com/gjsvip/dujiecode | 源码主仓库，push 即自动部署全部端 |
 
-**分流策略**：Worker **不做服务端跳转**——所有访客（含国内）统一由主域 `dujie_cone.520691.xyz` 直接服务；国内访客仅在落地页顶部看到镜像推荐条（软提示，`GET /api/region` 免鉴权端点提供地域与入口信息），可自行选择 GitHub Pages / Gitee 镜像加速。
+**分流策略**：Worker **不做服务端跳转**——所有访客（含国内）统一由主域 `dujiecone.520691.xyz` 直接服务；国内访客仅在落地页顶部看到镜像推荐条（软提示，`GET /api/region` 免鉴权端点提供地域与入口信息），可自行选择 GitHub Pages / Gitee 镜像加速。
 
 ### 一键发布
 
@@ -170,7 +170,7 @@ Gitee Pages 需账户完成**实名认证**后在网页端一键启用（OpenAPI
 2. 进入仓库 https://gitee.com/dujie_nb_admin/dujiecode → **服务 → Gitee Pages → 开始部署**；
 3. 启用后地址为 `https://dujie_nb_admin.gitee.io/dujiecode`，可作为 GitHub Pages 之外的备用国内入口。
 
-> 在实名认证完成前，国内可达入口为 GitHub Pages 镜像 `https://gjsvip.github.io/`（HTTP 200 已验证）；渡劫code 主域 `dujie_cone.520691.xyz` 由 Cloudflare 全球任播承载。
+> 在实名认证完成前，国内可达入口为 GitHub Pages 镜像 `https://gjsvip.github.io/`（HTTP 200 已验证）；渡劫code 主域 `dujiecone.520691.xyz` 由 Cloudflare 全球任播承载。
 
 ### CSDN 发布
 

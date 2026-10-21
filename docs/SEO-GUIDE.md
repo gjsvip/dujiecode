@@ -6,9 +6,9 @@
 
 | 站点 | 域名 | 用途 |
 |---|---|---|
-| 渡劫code 主域 | https://dujie_cone.520691.xyz | Cloudflare Worker + D1/KV/R2 |
+| 渡劫code 主域 | https://dujiecone.520691.xyz | Cloudflare Worker + D1/KV/R2 |
 | 个人官网 | https://www.520691.xyz | Cloudflare Pages（gjsvip-homepage） |
-| 博客 | https://blog.520691.xyz | Cloudflare Pages（gjsvip-blog） |
+| 博客 | https://www.520691.xyz | Cloudflare Pages（gjsvip-blog） |
 | Pages 镜像 | https://dujiecode-9ka.pages.dev | 渡劫code 备用 |
 | 官网镜像 | https://gjsvip-homepage.pages.dev | 官网备用 |
 | 博客镜像 | https://gjsvip-blog.pages.dev | 博客备用 |

@@ -2,7 +2,7 @@ name: Deploy to Cloudflare
 
 # 同步部署：push 到 main 或手动触发时，自动构建并部署
 #   - D1 数据库初始化（幂等，IF NOT EXISTS）
-#   - Worker（345 账号 dujiecode，自定义域名 dujie_cone.520691.xyz，不跳转、直接服务）
+#   - Worker（345 账号 dujiecode，自定义域名 dujiecone.520691.xyz，不跳转、直接服务）
 #   - Pages 官网（345 账号 dujiecode.pages.dev）
 #   - GitHub Pages 镜像（gjsvip.github.io，国内可达）
 #
@@ -94,12 +94,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| 目标 | 地址 |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| 渡劫code 主域 | https://dujie_cone.520691.xyz |" >> $GITHUB_STEP_SUMMARY
+          echo "| 渡劫code 主域 | https://dujiecone.520691.xyz |" >> $GITHUB_STEP_SUMMARY
           echo "| Pages 官网 | https://dujiecode-9ka.pages.dev |" >> $GITHUB_STEP_SUMMARY
           echo "| 提交 | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
 
   # GitHub Pages 镜像（§12-D2）：发布到用户站点 gjsvip.github.io（国内可达镜像）。
-  # base=/ 同根构建，CTA 绝对链接指向渡劫code 主域 dujie_cone.520691.xyz。
+  # base=/ 同根构建，CTA 绝对链接指向渡劫code 主域 dujiecone.520691.xyz。
   deploy-user-site:
     name: Deploy GitHub Pages 镜像 gjsvip.github.io
     runs-on: ubuntu-latest
@@ -120,7 +120,7 @@ jobs:
       - name: Build (base=/)
         run: |
           npx tsc --noEmit
-          VITE_APP_URL=https://dujie_cone.520691.xyz npx vite build
+          VITE_APP_URL=https://dujiecone.520691.xyz npx vite build
 
       - name: Publish to gjsvip.github.io (main)
         uses: peaceiris/actions-gh-pages@v4
@@ -139,7 +139,7 @@ jobs:
             echo "### GitHub Pages 镜像已部署 :earth_asia:"
             echo ""
             echo "- 地址：https://gjsvip.github.io （国内可达的 GitHub Pages 镜像）"
-            echo "- 渡劫code 主域：https://dujie_cone.520691.xyz"
+            echo "- 渡劫code 主域：https://dujiecone.520691.xyz"
             echo "- 个人官网：https://www.520691.xyz"
             echo "- 博客：https://blog.520691.xyz"
           } >> $GITHUB_STEP_SUMMARY

@@ -13,11 +13,13 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 # 主域路由（345 账号 520691.xyz zone）。
-# DNS：dujie_cone CNAME dujiecode.dujie.workers.dev（proxied=true，2026-10-20 已建）。
+# DNS：dujiecone CNAME dujiecode.dujie.workers.dev（proxied=true，2026-10-21 已建）。
+# 旧名 dujie_cone（带下划线）保留兼容，新主域为无下划线的 dujiecone。
 # 绑定方式：zone 级 Worker 路由（POST /zones/{zone_id}/workers/routes 已建立）——
 # workers/domains API 对所有令牌类型均返回 10405，故 custom_domain 模式不可用，
 # 改用普通 route pattern（等效：请求到达 CF 边缘后按 pattern 匹配执行 Worker）。
 routes = [
+  { pattern = "dujiecone.520691.xyz/*" }
   { pattern = "dujie_cone.520691.xyz/*" }
 ]
 
@@ -44,7 +46,7 @@ new_sqlite_classes = ["TerminalRoom"]
 
 [vars]
 ENVIRONMENT = "production"
-APP_ORIGIN = "https://dujie_cone.520691.xyz"
+APP_ORIGIN = "https://dujiecone.520691.xyz"
 MAX_AGENT_ROUNDS = "25"
 SSE_KEEPALIVE_SEC = "15"
 
@@ -55,7 +57,7 @@ CN_MIRROR_URL = "https://gjsvip.github.io/"
 
 # 多镜像 CORS 白名单（逗号分隔）：静态镜像站上的页面可跨源调用公开接口。
 # 覆盖 520691.xyz 域名体系（主域/官网/博客）+ GitHub Pages + CF Pages + Gitee Pages。
-CORS_ORIGINS = "https://dujie_cone.520691.xyz,https://www.520691.xyz,https://blog.520691.xyz,https://gjsvip.github.io,https://dujiecode.pages.dev,https://dujie_nb_admin.gitee.io"
+CORS_ORIGINS = "https://dujiecone.520691.xyz,https://dujie_cone.520691.xyz,https://www.520691.xyz,https://blog.520691.xyz,https://gjsvip.github.io,https://dujiecode.pages.dev,https://dujie_nb_admin.gitee.io"
 
 # 博客互动库（评论/点赞/浏览量/说说，三端静态站共用 API）
 [[d1_databases]]

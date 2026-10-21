@@ -38,7 +38,7 @@ export { TerminalRoom } from '../do/terminal-room'
 /* ------------------------------------------------------------------ */
 
 /** 主域（345 CF 账号自定义域名，官网唯一主入口） */
-const MAIN_DOMAIN = 'https://dujie_cone.520691.xyz'
+const MAIN_DOMAIN = 'https://dujiecone.520691.xyz'
 /** 国内镜像地址（GitHub Pages，国内可达且免实名认证；可切换为 Gitee Pages） */
 const DEFAULT_CN_MIRROR = 'https://gjsvip.github.io/'
 /** Gitee Pages 预期地址（账户完成实名认证并在仓库「服务 → Gitee Pages」启用后生效） */
