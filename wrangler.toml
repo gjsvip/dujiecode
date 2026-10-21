@@ -19,7 +19,7 @@ not_found_handling = "single-page-application"
 # workers/domains API 对所有令牌类型均返回 10405，故 custom_domain 模式不可用，
 # 改用普通 route pattern（等效：请求到达 CF 边缘后按 pattern 匹配执行 Worker）。
 routes = [
-  { pattern = "dujiecone.520691.xyz/*" }
+  { pattern = "dujiecone.520691.xyz/*" },
   { pattern = "dujie_cone.520691.xyz/*" }
 ]
 
