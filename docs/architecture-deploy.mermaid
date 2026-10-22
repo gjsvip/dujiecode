@@ -1,0 +1,26 @@
+flowchart TD
+    Dev["开发者 git push main"] --> CI1["GitHub Actions: deploy.yml"]
+    Dev --> CI2["GitHub Actions: mirror-to-gitee.yml"]
+
+    subgraph DuijieCode["渡劫code CI（deploy.yml）"]
+        B["npm ci → build（tsc+vite）→ test（Vitest）"]
+        D1["wrangler d1 execute ×2（幂等建表）"]
+        WD["wrangler deploy → dujiecone.520691.xyz（Worker 主域）"]
+        PG["wrangler pages deploy dist → dujiecode.pages.dev（官网镜像）"]
+        GHP["peaceiris/actions-gh-pages → gjsvip.github.io（国内镜像）"]
+        B --> D1 --> WD --> PG --> GHP
+    end
+
+    subgraph BlogCI["博客 CI（独立仓库）"]
+        BP["CF Pages 自动构建（www + blog.520691.xyz）"]
+        BG["GitHub Pages Action → gjsvip.github.io/blog"]
+        BE["Gitee Pages（半自动）"]
+    end
+
+    subgraph SEOJobs["SEO/巡检（待建）"]
+        CRON["Worker Cron Triggers（R2 备份 / 友链巡检 / RSS 抓取）"]
+        IDX["IndexNow 批量推送脚本（发文后手动/CI）"]
+    end
+
+    CI1 --> DuijieCode
+    CI2 --> GiteeMirror["Gitee 仓库 + gh-pages 分支（Gitee Pages 国内镜像）"]

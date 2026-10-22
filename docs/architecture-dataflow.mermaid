@@ -1,0 +1,42 @@
+flowchart LR
+    subgraph Visitors["访客"]
+        U["读者 / 工作台用户"]
+    end
+
+    subgraph StaticBlog["静态博客层（数据源 = 仓库 HTML + posts.json）"]
+        CFPages["www.520691.xyz<br/>Cloudflare Pages 主域（canonical 目标）"]
+        BlogAlias["blog.520691.xyz<br/>CF Pages 别名"]
+        GHBlog["gjsvip.github.io/blog<br/>GitHub Pages 国内镜像"]
+        GiteeBlog["Gitee Pages 备份"]
+    end
+
+    subgraph WorkerLayer["渡劫code Worker（dujiecone.520691.xyz，Hono）"]
+        MW["中间件链：requestId → CORS → JWT鉴权+限流"]
+        BlogAPI["/api/blog/*<br/>评论/点赞/浏览量/说说（免鉴权）"]
+        CodeAPI["/api/auth /workspaces /agent /shell /terminal<br/>（JWT 鉴权）"]
+        SPA["ASSETS 静态绑定<br/>（dujiecode 前端 SPA）"]
+    end
+
+    subgraph CFStorage["Cloudflare 数据层（345 账号）"]
+        BLOG_DB[("gjsvip-blog-db（D1）<br/>comments / likes / views / says")]
+        DB[("dujiecode-db（D1）<br/>users / providers / workspaces / conversations")]
+        KV[("KV：会话 / 限流计数")]
+        R2[("R2：工作区文件 / 备份")]
+        DO[("TerminalRoom（Durable Object）")]
+    end
+
+    U --> CFPages
+    U --> GHBlog
+    U --> GiteeBlog
+    CFPages -- "fetch /api/blog/*（CORS 白名单）" --> BlogAPI
+    GHBlog -.->|同源或跨源 CORS| BlogAPI
+    GiteeBlog -.-> BlogAPI
+    U -- "登录 / AI 工作台" --> CodeAPI
+    MW --> BlogAPI
+    MW --> CodeAPI
+    BlogAPI --> BLOG_DB
+    CodeAPI --> DB
+    CodeAPI --> KV
+    CodeAPI --> R2
+    CodeAPI --> DO
+    CodeAPI --> SPA

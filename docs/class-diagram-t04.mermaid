@@ -1,0 +1,44 @@
+%% T04 评论系统增强 — 新增模块类图（实现均为纯函数 + Hono 中间件，不引入类；类图仅表意）
+%% 来源：docs/ARCH-T04-COMMENT-ADMIN-2026-10-21.md 附 C
+classDiagram
+    class BlogConfig {
+        +boolean turnstileEnabled
+        +string turnstileSiteKey
+        +boolean turnstileFailOpen
+        +boolean moderationEnabled
+        +boolean notifyEnabled
+        +getBlogConfig(env, opts)$ BlogConfig
+        +invalidateBlogConfig()$
+    }
+    class VisitorHash {
+        +blogSalt(env)$ string
+        +visitorHash(ip, ua, salt)$ string
+        +ipBanHash(ip, salt)$ string
+        +requestIp(raw)$ string
+    }
+    class TurnstileVerifier {
+        +verifyTurnstile(env, token, remoteIp)$ TurnstileOutcome
+    }
+    class AdminAuth {
+        +ADMIN_TOKEN_HEADER string$
+        +timingSafeEqualHex(a, b)$ boolean
+        +verifyAdminToken(env, header)$ boolean
+        +adminAuth MiddlewareHandler$
+    }
+    class ReplyNotifier {
+        +notifyParentOfReply(env, params)$ NotifyResult
+    }
+    class BackupService {
+        +runWeeklyBackup(env)$ BackupSummary
+    }
+    class BlogRoutes
+    class AdminRoutes
+    BlogRoutes ..> BlogConfig : 读开关
+    BlogRoutes ..> TurnstileVerifier : 提交校验
+    BlogRoutes ..> ReplyNotifier : approved 回复触发
+    BlogRoutes ..> VisitorHash : 指纹/限流/IP 哈希
+    AdminRoutes ..> AdminAuth : 中间件鉴权
+    AdminRoutes ..> ReplyNotifier : approve 触发
+    ReplyNotifier ..> BlogConfig : notify_enabled
+    TurnstileVerifier ..> BlogConfig : enabled/failOpen
+    BackupService ..> BlogConfig : 无需开关，独立 cron

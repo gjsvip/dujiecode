@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant FE as 博客页 blog.js
+    participant W as Worker /api/blog
+    participant KV as KV 限流桶
+    participant D1 as BLOG_DB (D1)
+
+    FE->>W: POST /api/blog/comments {slug,nickname,email,website,content,parentId}
+    W->>W: 字段强校验（长度/格式）
+    W->>KV: 读 blog:rl:{指纹}:{分钟桶}（2 条/分钟）
+    alt 超频
+        W-->>FE: 429 RATE_LIMITED
+    end
+    W->>D1: 校验 parentId 指向同文章已审核评论
+    W->>D1: INSERT comments（status='approved' 直接发布）
+    W-->>FE: 201 {id}
+    Note over W,D1: ▲ 增强点（T04）：Turnstile 校验、status='pending' 审核队列、<br/>黑名单、Resend 回复通知、每周 Cron 导出 R2
