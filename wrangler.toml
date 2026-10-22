@@ -31,6 +31,7 @@ database_id = "67fd4b8a-464b-4799-ac92-ad060cb91a48"
 [[kv_namespaces]]
 binding = "KV"
 id = "1c168f5887d5457b8fa456084c9ca4b1"
+preview_id = "3b19cb20b843447fbefcc5890249802d"
 
 [[r2_buckets]]
 binding = "R2"

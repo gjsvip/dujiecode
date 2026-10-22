@@ -123,66 +123,86 @@ adminRoutes.get('/comments', async (c) => {
 
   // 搜索关键词：≤50，超长截断（设计未定义错误码，截断为最小侵入处理）
   const q = (c.req.query('q') ?? '').trim().slice(0, MAX_Q)
-  const likePattern = `%${escapeLike(q)}%`
 
-  // 三组可选过滤统一用 `?n IS NULL OR ...` 形态：命中索引且零字符串拼接
-  const slugVal = slug === '' ? null : slug
-  const statusVal = status
-  const qVal = q === '' ? null : q
-  const where =
-    "(?1 IS NULL OR c.slug = ?2) AND (?3 IS NULL OR c.status = ?4) " +
-    "(?5 IS NULL OR (c.nickname LIKE ?6 ESCAPE '\\' OR c.content LIKE ?7 ESCAPE '\\'))"
+  // 条件拼接 WHERE（仅在有过滤时追加子句，零字符串拼接进 SQL 本体）
+  // + 参数数组 bind：规避 D1 client 对编号参数 ?n 与 IS NULL 组合的兼容歧义
+  const conds: string[] = []
+  const args: (string | number)[] = []
+  if (slug !== '') {
+    conds.push('c.slug = ?')
+    args.push(slug)
+  }
+  if (status !== null) {
+    conds.push('c.status = ?')
+    args.push(status)
+  }
+  if (q !== '') {
+    conds.push("(c.nickname LIKE ? ESCAPE '\\' OR c.content LIKE ? ESCAPE '\\')")
+    args.push(`%${escapeLike(q)}%`, `%${escapeLike(q)}%`)
+  }
+  const where = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : ''
+  const pageArgs = [page.pageSize, (page.page - 1) * page.pageSize]
 
-  const { results } = await c.env.BLOG_DB.prepare(
-    `SELECT c.id, c.parent_id, c.slug, c.nickname, c.website, c.content, c.status, c.created_at, c.ip_hash,
-            ce.email AS email,
-            (SELECT COUNT(*) FROM likes l WHERE l.target_type='comment' AND l.target_id=CAST(c.id AS TEXT)) AS likes,
-            (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count
-     FROM comments c
-     LEFT JOIN comment_emails ce ON ce.comment_id = c.id
-     WHERE ${where}
-     ORDER BY c.created_at DESC, c.id DESC
-     LIMIT ?8 OFFSET ?9`,
-  )
-    .bind(slugVal, slugVal, statusVal, statusVal, qVal, likePattern, likePattern, page.pageSize, (page.page - 1) * page.pageSize)
-    .all<{
-      id: number
-      parent_id: number | null
-      slug: string
-      nickname: string
-      website: string
-      content: string
-      status: string
-      created_at: string
-      ip_hash: string | null
-      email: string | null
-      likes: number
-      reply_count: number
-    }>()
+  interface AdminCommentRow {
+    id: number
+    parent_id: number | null
+    slug: string
+    nickname: string
+    website: string
+    content: string
+    status: string
+    created_at: string
+    ip_hash: string | null
+    email: string | null
+    likes: number
+    reply_count: number
+  }
 
-  // 同 WHERE 的 COUNT(*)（total 与列表严格一致）
-  const totalRow = await c.env.BLOG_DB.prepare(`SELECT COUNT(*) AS total FROM comments c WHERE ${where}`)
-    .bind(slugVal, slugVal, statusVal, statusVal, qVal, likePattern, likePattern)
-    .first<{ total: number }>()
+  try {
+    const { results } = await c.env.BLOG_DB.prepare(
+      `SELECT c.id, c.parent_id, c.slug, c.nickname, c.website, c.content, c.status, c.created_at, c.ip_hash,
+              ce.email AS email,
+              (SELECT COUNT(*) FROM likes l WHERE l.target_type='comment' AND l.target_id=CAST(c.id AS TEXT)) AS likes,
+              (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count
+       FROM comments c
+       LEFT JOIN comment_emails ce ON ce.comment_id = c.id
+       ${where}
+       ORDER BY c.created_at DESC, c.id DESC
+       LIMIT ? OFFSET ?`,
+    )
+      .bind(...args, ...pageArgs)
+      .all<AdminCommentRow>()
 
-  const items = (results ?? []).map((r) => ({
-    id: Number(r.id),
-    parentId: r.parent_id === null ? null : Number(r.parent_id),
-    slug: r.slug,
-    nickname: r.nickname,
-    emailMasked: maskEmail(typeof r.email === 'string' ? r.email : ''),
-    website: r.website ?? '',
-    content: r.content,
-    status: r.status,
-    createdAt: r.created_at,
-    ipHash: r.ip_hash ?? '',
-    likes: Number(r.likes ?? 0),
-    replyCount: Number(r.reply_count ?? 0),
-  }))
-  return c.json({
-    code: 0,
-    data: { items, total: Number(totalRow?.total ?? 0), page: page.page, page_size: page.pageSize },
-  })
+    // 同 WHERE 的 COUNT(*)（total 与列表严格一致）
+    const totalRow = await c.env.BLOG_DB.prepare(`SELECT COUNT(*) AS total FROM comments c ${where}`)
+      .bind(...args)
+      .first<{ total: number }>()
+
+    const items = (results ?? []).map((r) => ({
+      id: Number(r.id),
+      parentId: r.parent_id === null ? null : Number(r.parent_id),
+      slug: r.slug,
+      nickname: r.nickname,
+      emailMasked: maskEmail(typeof r.email === 'string' ? r.email : ''),
+      website: r.website ?? '',
+      content: r.content,
+      status: r.status,
+      createdAt: r.created_at,
+      ipHash: r.ip_hash ?? '',
+      likes: Number(r.likes ?? 0),
+      replyCount: Number(r.reply_count ?? 0),
+    }))
+    return c.json({
+      code: 0,
+      data: { items, total: Number(totalRow?.total ?? 0), page: page.page, page_size: page.pageSize },
+    })
+  } catch (err) {
+    // 诊断日志（§8：scope=admin，不带敏感数据）；线上 500 的根因追踪用
+    console.error(
+      JSON.stringify({ level: 'error', scope: 'admin', msg: 'comments list failed', error: String(err) }),
+    )
+    return fail(c, 'INTERNAL', '服务器内部错误', 500)
+  }
 })
 
 /* ------------------------------------------------------------------ */
